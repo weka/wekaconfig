@@ -1,0 +1,8 @@
+sudo weka cluster create --host-ips=
+sudo weka cluster cluster update --data-drives=-2 --parity-drives=2
+sudo weka cluster hot-spare 1
+sudo weka cluster cloud enable
+sudo weka cluster update --cluster-name=None
+sudo weka cluster host apply --all --force
+sleep 60
+sudo weka cluster start-io
