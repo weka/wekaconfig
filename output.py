@@ -81,7 +81,7 @@ class WekaCluster(object):
         return result
 
     def _parity(self):
-        base = 'cluster update '
+        base = 'update '
         data_drives = len(self.config.selected_hosts) - 2
         result = base + f"--data-drives={data_drives}" + f" --parity-drives=2"
         return result
@@ -114,6 +114,7 @@ class WekaCluster(object):
 
     def cluster_config(self, file):
         WEKA_CLUSTER = "sudo weka cluster "
+        WEKA = "sudo weka "
         NL = "\n"
         with file as fp:
             fp.write(WEKA_CLUSTER + self._create() + NL)
@@ -129,7 +130,7 @@ class WekaCluster(object):
             for item in self._failure_domain():
                 fp.write(WEKA_CLUSTER + item + NL)
             fp.write(WEKA_CLUSTER + self._hot_spare() + NL)
-            fp.write(WEKA_CLUSTER + self._cloud() + NL)
+            fp.write(WEKA + self._cloud() + NL)
             fp.write(WEKA_CLUSTER + self._name() + NL)
             fp.write(WEKA_CLUSTER + self._apply() + NL)
             fp.write("sleep 60\n")
