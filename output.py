@@ -10,12 +10,15 @@ class WekaCluster(object):
     def _create(self):
         output = 'create '
         # hostnames
-        for host in self.config.selected_hosts:
-            output += host + ' '
+        hostid = 0
+        for hostname, host in sorted(self.config.selected_hosts.items()):
+            output += hostname + ' '
+            host.host_id = hostid
+            hostid += 1
 
         # host-ips
         output += "--host-ips="
-        for host in self.config.selected_hosts.values():
+        for hostname, host in sorted(self.config.selected_hosts.items()):
             count = 0
             for nic_list in host.dataplane_nics.values():
                 for nic in nic_list:
@@ -31,50 +34,50 @@ class WekaCluster(object):
     # returns a list of strings
     def _net_add(self):
         base = 'host net add '
-        host_id = 0
+        #host_id = 0
         result = list()
-        for host in self.config.selected_hosts.values():
-            thishost = base + str(host_id) + ' '
+        for hostname, host in sorted(self.config.selected_hosts.items()):
+            thishost = base + str(host.host_id) + ' '
             for nic_list in host.dataplane_nics.values():
                 for nic in nic_list:
                     thishost += nic.name
                 result.append(thishost)
-            host_id += 1
+            #host_id += 1
         return result
 
     def _drive_add(self):
         base = 'drive add '
-        host_id = 0
+        #host_id = 0
         result = list()
-        for host in self.config.selected_hosts.values():
-            thishost = base + str(host_id) + ' '
+        for hostname, host in sorted(self.config.selected_hosts.items()):
+            thishost = base + str(host.host_id) + ' '
             for drive in sorted(host.drives.keys()):
                 thishost += drive + ' '
             thishost += '--force'
             result.append(thishost)
-            host_id += 1
+            #host_id += 1
         return result
 
     def _host_cores(self):
         base = 'host cores '
-        host_id = 0
+        #host_id = 0
         result = list()
-        for host in self.config.selected_hosts.values():
+        for hostname, host in sorted(self.config.selected_hosts.items()):
             cores = self.config.selected_cores
-            thishost = base + str(host_id) + ' ' + str(cores.usable) + ' --frontend-dedicated-cores ' + \
+            thishost = base + str(host.host_id) + ' ' + str(cores.usable) + ' --frontend-dedicated-cores ' + \
                        str(cores.fe) + ' --drives-dedicated-cores ' + str(cores.drives)
-            host_id += 1
+            #host_id += 1
             result.append(thishost)
         return result
 
     def _dedicate(self):
         base = 'host dedicate '
-        host_id = 0
+        #host_id = 0
         result = list()
-        for host in self.config.selected_hosts.values():
-            host_id += 1
-            thishost = base + str(host_id) + ' on'
+        for hostname, host in sorted(self.config.selected_hosts.items()):
+            thishost = base + str(host.host_id) + ' on'
             result.append(thishost)
+            #host_id += 1
         return result
 
     def _parity(self):
@@ -85,12 +88,12 @@ class WekaCluster(object):
 
     def _failure_domain(self):
         base = 'host failure-domain '
-        host_id = 0
+        #host_id = 0
         result = list()
-        for host in self.config.selected_hosts.values():
-            host_id += 1
-            thishost = base + str(host_id) + ' --auto'
+        for hostname, host in sorted(self.config.selected_hosts.items()):
+            thishost = base + str(host.host_id) + ' --auto'
             result.append(thishost)
+            #host_id += 1
         return result
 
     def _hot_spare(self):

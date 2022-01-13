@@ -206,16 +206,16 @@ class SelectDPNetworks(CancelNextForm):
         self.sorted_hosts = list()
         self.possible_dps = self.guess_networks(self.parentApp.target_hosts)
         # what happens when there's only 1 possible dp network?
-        self.dataplane_networks = self.add(Networks, scroll_exit=True, max_height=9,
-                                           rely=2, #width=25,
+        self.dataplane_networks = self.add(Networks, scroll_exit=True, max_height=10,
+                                           use_two_lines = True, rely=2, #width=25,
                                            max_width=55,
                                            name='Select DP Networks:',
                                            values=self.possible_dps)
-        self.hosts_field = self.add(Hosts, scroll_exit=True, max_height=9,
+        self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts", name="Number of Hosts:",
+                                        use_two_lines=False, editable=False, max_width=55)
+        self.hosts_field = self.add(Hosts, scroll_exit=True, #max_height=9,
                                     name='Select Hosts:', relx=57, rely=2) #,
                                     #values=["1", "2"])
-        self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts", name="Number of Hosts:",
-                                    use_two_lines=False, editable=False)
 
     def on_ok(self):
         """
