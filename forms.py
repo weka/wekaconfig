@@ -51,6 +51,8 @@ class SelectCores(PrevDoneForm):
                                     use_two_lines=False, editable=False, begin_entry_at=22)
         self.total_drives = self.add(npyscreen.TitleFixedText, fieldname="drives", name="  Drives per host:",
                                      use_two_lines=False, editable=False, begin_entry_at=22)
+        self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts", name="  Number of Hosts:",
+                                        use_two_lines=False, editable=False, begin_entry_at=22)
         self.nextrely += 1
         self.usable_cores = self.add(UsableCoresWidget, fieldname="usable", name="Total Cores for Weka:",
                                      use_two_lines=False, begin_entry_at=22)
@@ -71,7 +73,8 @@ class SelectCores(PrevDoneForm):
                                      use_two_lines=False, begin_entry_at=22)
 
     def beforeEditing(self):
-        if self.parentApp.selected_cores is None:
+        PA = self.parentApp
+        if PA.selected_cores is None:
             self.num_cores = self.analyse_cores()
             self.num_drives = self.analyse_drives()
             self.parentApp.selected_cores = Cores(self.num_cores, self.num_drives)
@@ -79,19 +82,20 @@ class SelectCores(PrevDoneForm):
         self.parentApp.selected_cores.recalculate()
         self.total_cores.set_value(str(self.num_cores))
         self.total_drives.set_value(str(self.num_drives))
-        self.usable_cores.set_value(str(self.parentApp.selected_cores.usable))
-        self.fe_cores.set_value(str(self.parentApp.selected_cores.fe))
-        self.compute_cores.set_value(str(self.parentApp.selected_cores.compute))
-        self.drives_cores.set_value(str(self.parentApp.selected_cores.drives))
+        self.num_hosts_field.set_value(str(len(PA.selected_hosts)))
+        self.usable_cores.set_value(str(PA.selected_cores.usable))
+        self.fe_cores.set_value(str(PA.selected_cores.fe))
+        self.compute_cores.set_value(str(PA.selected_cores.compute))
+        self.drives_cores.set_value(str(PA.selected_cores.drives))
 
-        self.name_field.set_value(self.parentApp.clustername)
-        if self.parentApp.datadrives is None or \
-                (self.parentApp.datadrives + self.parentApp.paritydrives) > len(self.parentApp.selected_hosts):
-            self.parentApp.datadrives = len(self.parentApp.selected_hosts) - 2
-            self.parentApp.paritydrives = 2
+        self.name_field.set_value(PA.clustername)
+        if PA.datadrives is None or \
+                (PA.datadrives + PA.paritydrives) > len(PA.selected_hosts):
+            PA.datadrives = len(PA.selected_hosts) - 2
+            PA.paritydrives = 2
 
-        self.data_field.set_value(str(self.parentApp.datadrives))
-        self.parity_field.set_value(str(self.parentApp.paritydrives))
+        self.data_field.set_value(str(PA.datadrives))
+        self.parity_field.set_value(str(PA.paritydrives))
 
     def on_ok(self):
         self.parentApp.selected_cores.usable = int(self.usable_cores.value)
@@ -158,6 +162,14 @@ class SelectCores(PrevDoneForm):
 
         return reference_drives
 
+class Hosts(npyscreen.TitleMultiSelect):
+    def when_value_edited(self):
+        parent = self.parent
+        #PA = parent.parentApp
+        parent.num_hosts_field.set_value('  '+str(len(parent.hosts_field.value)))
+        parent.num_hosts_field.display()
+
+
 class Networks(npyscreen.TitleMultiSelect):
     def when_value_edited(self):
         value = self.parent.dataplane_networks.value
@@ -175,6 +187,7 @@ class Networks(npyscreen.TitleMultiSelect):
             self.parent.hosts_field.set_value(PA.hosts_value)
             self.parent.hosts_field.set_values(sorted(PA.sorted_hosts))
             #self.parent.hosts_field.display()
+        self.parent.num_hosts_field.set_value('  ' + str(len(PA.hosts_value)))
         self.parent.display()
 
     def safe_to_exit(self):
@@ -198,9 +211,11 @@ class SelectDPNetworks(CancelNextForm):
                                            max_width=55,
                                            name='Select DP Networks:',
                                            values=self.possible_dps)
-        self.hosts_field = self.add(npyscreen.TitleMultiSelect, scroll_exit=True, max_height=9,
-                                    name='Select Hosts:', relx=60, rely=2) #,
+        self.hosts_field = self.add(Hosts, scroll_exit=True, max_height=9,
+                                    name='Select Hosts:', relx=57, rely=2) #,
                                     #values=["1", "2"])
+        self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts", name="Number of Hosts:",
+                                    use_two_lines=False, editable=False)
 
     def on_ok(self):
         """
