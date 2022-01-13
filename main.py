@@ -5,7 +5,7 @@
 import argparse
 
 from output import WekaCluster
-from ui import WekaConfigApp
+from apps import WekaConfigApp
 from weka import scan_hosts
 
 if __name__ == '__main__':
@@ -22,15 +22,18 @@ if __name__ == '__main__':
 
     config = WekaConfigApp(host_list)
     config.run()
-    print(f"App exited - writing config.txt")
-    #print(f"target hosts = {config.target_hosts}")
-    #print(f"nets = {config.selected_dps}")
-    #print(f"hosts = {config.selected_hosts}")
-    #print(f"cores = {config.selected_cores}")
-    #print(f"name = {config.clustername}")
-    #print(f"datadrives = {config.datadrives}")
-    #print(f"parity = {config.paritydrives}")
+    if not config.cleanexit:
+        print("App was cancelled.")
+    else:
+        print(f"App exited - writing config.txt")
+        #print(f"target hosts = {config.target_hosts}")
+        #print(f"nets = {config.selected_dps}")
+        #print(f"hosts = {config.selected_hosts}")
+        #print(f"cores = {config.selected_cores}")
+        #print(f"name = {config.clustername}")
+        #print(f"datadrives = {config.datadrives}")
+        #print(f"parity = {config.paritydrives}")
 
-    cluster = WekaCluster(config)
-    fo = open("config.txt", "w")
-    cluster.cluster_config(fo)
+        cluster = WekaCluster(config)
+        fo = open("config.txt", "w")
+        cluster.cluster_config(fo)
