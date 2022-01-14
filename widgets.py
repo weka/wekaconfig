@@ -11,8 +11,36 @@ movement_help = """Cursor movement:
     Tab: move to next field
     """
 
+class WekaTitleText(npyscreen.TitleText):
+    def __init__(self, *args, label='', fieldname='', **keywords):
+        #keywords["use_two_lines"] = False
+        label = label + ':'
+        label_width = keywords["begin_entry_at"] - keywords["relx"] +1
+        keywords["name"] = label.rjust(label_width, ' ')
+        super(WekaTitleText, self).__init__(*args, **keywords)
 
-class CoresWidgetBase(npyscreen.TitleNumeric):
+
+class WekaTitleNumeric(npyscreen.TitleNumeric):
+    def __init__(self, *args, label='', fieldname='', **keywords):
+        #keywords["use_two_lines"] = False
+        label = label + ':'
+        label_width = keywords["begin_entry_at"] - keywords["relx"] +1
+        keywords["name"] = label.rjust(label_width, ' ')
+        super(WekaTitleNumeric, self).__init__(*args, **keywords)
+
+class WekaTitleFixedText(npyscreen.TitleFixedText):
+    def __init__(self, *args, label='', fieldname='', **keywords):
+        #keywords["use_two_lines"] = False
+        label = label + ':'
+        label_width = keywords["begin_entry_at"] - keywords["relx"] +1
+        keywords["name"] = label.rjust(label_width, ' ')
+        keywords["labelColor"] = 'NO_EDIT'
+        keywords["editable"] = False
+        super(WekaTitleFixedText, self).__init__(*args, **keywords)
+
+
+#class CoresWidgetBase(npyscreen.TitleNumeric):
+class CoresWidgetBase(WekaTitleNumeric):
     def __init__(self, *args, fieldname='', **keywords):
         self.fieldname = fieldname
         self.last_value = None
@@ -152,7 +180,7 @@ class NonEmptyfield(npyscreen.Textfield):
             return False
 
 
-class TitleNonEmpty(npyscreen.TitleText):
+class TitleNonEmpty(WekaTitleText):
     _entry_type = NonEmptyfield
 
     def __init__(self, *args, **keywords):

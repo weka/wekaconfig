@@ -6,7 +6,9 @@ import npyscreen
 
 import logic
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
-                    NameWidget, DataWidget, ParityWidget
+                    NameWidget, DataWidget, ParityWidget, WekaTitleText, WekaTitleNumeric, \
+                    WekaTitleFixedText
+
 from logic import Cores
 
 movement_help = """Cursor movement:
@@ -49,53 +51,39 @@ class SelectCores(PrevDoneForm):
         self.title1 = self.add(npyscreen.FixedText, value="Host Configuration Reference",
                                     color='NO_EDIT',
                                     editable=False)
-        self.total_cores = self.add(npyscreen.TitleFixedText, fieldname="cores",
-                                    name="  Cores per host:",
-                                    labelColor='NO_EDIT',
-                                    use_two_lines=False, editable=False,
+        self.total_cores = self.add(WekaTitleFixedText, fieldname="cores",
+                                    label="Cores per host",
                                     begin_entry_at=19)
-        self.total_drives = self.add(npyscreen.TitleFixedText, fieldname="drives",
-                                     name=" Drives per host:",
-                                     labelColor='NO_EDIT',
-                                     use_two_lines=False, editable=False,
+        self.total_drives = self.add(WekaTitleFixedText, fieldname="drives",
+                                     label="Drives per host",
                                      begin_entry_at=19)
-        self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts",
-                                     name=" Number of hosts:",
-                                     labelColor='NO_EDIT',
-                                     use_two_lines=False, editable=False,
+        self.num_hosts_field = self.add(WekaTitleFixedText, fieldname="num_hosts",
+                                     label="Number of hosts",
                                      begin_entry_at=19)
         self.nextrely += 2 # skip 2 lines
         self.usable_cores = self.add(UsableCoresWidget, fieldname="usable",
-                                     name="Total Weka Cores:",
-                                     use_two_lines=False,
+                                     label="Total Weka Cores",
                                      begin_entry_at=19)
         self.nextrely += 1 # skip a line
         self.fe_cores = self.add(FeCoresWidget, fieldname="fe",
-                                     name="        FE Cores:",
-                                     use_two_lines=False,
+                                     label="FE Cores",
                                      begin_entry_at=19)
         self.drives_cores = self.add(DrivesCoresWidget, fieldname="drives",
-                                     name="    DRIVES Cores:",
-                                     use_two_lines=False,
+                                     label="DRIVES Cores",
                                      begin_entry_at=19)
         self.compute_cores = self.add(ComputeCoresWidget, fieldname="compute",
-                                      name="   COMPUTE Cores:",
-                                      use_two_lines=False,
+                                      label="COMPUTE Cores",
                                       begin_entry_at=19)
         self.nextrely += 1
         self.name_field = self.add(NameWidget, fieldname="clustername",
-                                      name="    Cluster Name:",
-                                      use_two_lines=False,
+                                      label="Cluster Name",
                                       begin_entry_at=19)
         self.nextrely += 1
         self.data_field = self.add(DataWidget, fieldname="data",
-                                      name="     Data Drives:",
-                                      use_two_lines=False,
+                                      label="Data Drives",
                                       begin_entry_at=19)
         self.parity_field = self.add(ParityWidget, fieldname="parity",
-                                      name="   Parity Drives:",
-                                      use_two_lines=False,
-                                      begin_entry_at=19)
+                                     label="Parity Drives", begin_entry_at=19)
 
     def beforeEditing(self):
         PA = self.parentApp
