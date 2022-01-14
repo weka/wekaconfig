@@ -206,16 +206,28 @@ class SelectDPNetworks(CancelNextForm):
         self.sorted_hosts = list()
         self.possible_dps = self.guess_networks(self.parentApp.target_hosts)
         # what happens when there's only 1 possible dp network?
-        self.dataplane_networks = self.add(Networks, scroll_exit=True, max_height=10,
-                                           use_two_lines = True, rely=2, #width=25,
-                                           max_width=55,
-                                           name='Select DP Networks:',
-                                           values=self.possible_dps)
+        self.dataplane_networks = self.add(Networks, fieldname="networks",
+                                   scroll_exit=True, # allow them to exit using arrow keys
+                                   max_height=15,    # not too big - need room below for next field
+                                   use_two_lines=True, # input fields start on 2nd line
+                                   rely=2, # put it high on the screen
+                                   max_width=38, # leave room to the right for hosts entry
+                                   begin_entry_at=2, # make the list under the title
+                                   name='Select DP Networks:',  # label/title
+                                   #values=["255.255.255.255/32 - 200 Gbps"]) # testing
+                                   values=self.possible_dps)
+
         self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts", name="Number of Hosts:",
-                                        use_two_lines=False, editable=False, max_width=55)
-        self.hosts_field = self.add(Hosts, scroll_exit=True, #max_height=9,
-                                    name='Select Hosts:', relx=57, rely=2) #,
-                                    #values=["1", "2"])
+                                    use_two_lines=False, editable=False, max_width=22)
+        self.hosts_field = self.add(Hosts, fieldname="hosts",
+                                    scroll_exit=True,  # allow them to exit using arrow keys
+                                    use_two_lines=True,  # input fields start on 2nd line
+                                    rely=2,  # put it high on the screen
+                                    relx=39, # place to the right of Networks (above)
+                                    begin_entry_at=2,  # make the list under the title
+                                    name='Select Hosts:')
+                                    #values=["01234567890123456789012345678901234567890123456789", # testing
+                                    #        "          1         2         3         4"] ) # testing
 
     def on_ok(self):
         """
