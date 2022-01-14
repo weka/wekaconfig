@@ -12,8 +12,8 @@ class WekaTheme(npyscreen.ThemeManager):
         'FORMDEFAULT' : 'WHITE_BLACK',
         'NO_EDIT'     : 'YELLOW_BLACK',
         'STANDOUT'    : 'CYAN_BLACK',
-        'CURSOR'      : 'CYAN_BLACK',
-        'CURSOR_INVERSE': 'BLACK_CYAN',
+        'CURSOR'      : 'WHITE_BLACK',
+        'CURSOR_INVERSE': 'BLACK_WHITE',
         'LABEL'       : 'GREEN_BLACK',
         'LABELBOLD'   : 'GREEN_BLACK',
         'CONTROL'     : 'YELLOW_BLACK',
@@ -24,6 +24,7 @@ class WekaTheme(npyscreen.ThemeManager):
         'VERYGOOD'    : 'BLACK_GREEN',
         'CAUTION'     : 'YELLOW_BLACK',
         'CAUTIONHL'   : 'BLACK_YELLOW',
+        'BOLD': 'WHITE_BLACK', # basically, no bold
     }
 
 class WekaConfigApp(npyscreen.NPSAppManaged):

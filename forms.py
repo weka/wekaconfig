@@ -46,7 +46,9 @@ class SelectCores(PrevDoneForm):
         super(SelectCores, self).__init__(*args, help=help, **kwargs)
 
     def create(self):
-        self.title1 = self.add(npyscreen.FixedText, value="Host Configuration Reference", editable=False)
+        self.title1 = self.add(npyscreen.FixedText, value="Host Configuration Reference",
+                                    color='NO_EDIT',
+                                    editable=False)
         self.total_cores = self.add(npyscreen.TitleFixedText, fieldname="cores",
                                     name="  Cores per host:",
                                     labelColor='NO_EDIT',
