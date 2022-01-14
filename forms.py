@@ -46,31 +46,54 @@ class SelectCores(PrevDoneForm):
         super(SelectCores, self).__init__(*args, help=help, **kwargs)
 
     def create(self):
-        self.title1 = self.add(npyscreen.FixedText, value="Host Configuration", editable=False)
-        self.total_cores = self.add(npyscreen.TitleFixedText, fieldname="cores", name="  Cores per host:",
-                                    use_two_lines=False, editable=False, begin_entry_at=22)
-        self.total_drives = self.add(npyscreen.TitleFixedText, fieldname="drives", name="  Drives per host:",
-                                     use_two_lines=False, editable=False, begin_entry_at=22)
-        self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts", name="  Number of Hosts:",
-                                        use_two_lines=False, editable=False, begin_entry_at=22)
+        self.title1 = self.add(npyscreen.FixedText, value="Host Configuration Reference", editable=False)
+        self.total_cores = self.add(npyscreen.TitleFixedText, fieldname="cores",
+                                    name="  Cores per host:",
+                                    labelColor='NO_EDIT',
+                                    use_two_lines=False, editable=False,
+                                    begin_entry_at=19)
+        self.total_drives = self.add(npyscreen.TitleFixedText, fieldname="drives",
+                                     name=" Drives per host:",
+                                     labelColor='NO_EDIT',
+                                     use_two_lines=False, editable=False,
+                                     begin_entry_at=19)
+        self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts",
+                                     name=" Number of hosts:",
+                                     labelColor='NO_EDIT',
+                                     use_two_lines=False, editable=False,
+                                     begin_entry_at=19)
+        self.nextrely += 2 # skip 2 lines
+        self.usable_cores = self.add(UsableCoresWidget, fieldname="usable",
+                                     name="Total Weka Cores:",
+                                     use_two_lines=False,
+                                     begin_entry_at=19)
+        self.nextrely += 1 # skip a line
+        self.fe_cores = self.add(FeCoresWidget, fieldname="fe",
+                                     name="        FE Cores:",
+                                     use_two_lines=False,
+                                     begin_entry_at=19)
+        self.drives_cores = self.add(DrivesCoresWidget, fieldname="drives",
+                                     name="    DRIVES Cores:",
+                                     use_two_lines=False,
+                                     begin_entry_at=19)
+        self.compute_cores = self.add(ComputeCoresWidget, fieldname="compute",
+                                      name="   COMPUTE Cores:",
+                                      use_two_lines=False,
+                                      begin_entry_at=19)
         self.nextrely += 1
-        self.usable_cores = self.add(UsableCoresWidget, fieldname="usable", name="Total Cores for Weka:",
-                                     use_two_lines=False, begin_entry_at=22)
+        self.name_field = self.add(NameWidget, fieldname="clustername",
+                                      name="    Cluster Name:",
+                                      use_two_lines=False,
+                                      begin_entry_at=19)
         self.nextrely += 1
-        self.fe_cores = self.add(FeCoresWidget, fieldname="fe", name="FE Cores:", use_two_lines=False,
-                                 begin_entry_at=22)
-        self.drives_cores = self.add(DrivesCoresWidget, fieldname="drives", name="DRIVES Cores:", use_two_lines=False,
-                                     begin_entry_at=22)
-        self.compute_cores = self.add(ComputeCoresWidget, fieldname="compute", name="COMPUTE Cores:",
-                                      use_two_lines=False, begin_entry_at=22)
-        self.nextrely += 1
-        self.name_field = self.add(NameWidget, fieldname="clustername", name="Name of the cluster:",
-                                   value="changeme", use_two_lines=False, begin_entry_at=22)
-        self.nextrely += 1
-        self.data_field = self.add(DataWidget, fieldname="data", name="Data Drives:",
-                                   use_two_lines=False, begin_entry_at=22)
-        self.parity_field = self.add(ParityWidget, fieldname="parity", name="Parity Drives:",
-                                     use_two_lines=False, begin_entry_at=22)
+        self.data_field = self.add(DataWidget, fieldname="data",
+                                      name="     Data Drives:",
+                                      use_two_lines=False,
+                                      begin_entry_at=19)
+        self.parity_field = self.add(ParityWidget, fieldname="parity",
+                                      name="   Parity Drives:",
+                                      use_two_lines=False,
+                                      begin_entry_at=19)
 
     def beforeEditing(self):
         PA = self.parentApp
@@ -218,6 +241,7 @@ class SelectDPNetworks(CancelNextForm):
                                    values=self.possible_dps)
 
         self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts", name="Number of Hosts:",
+                                    labelColor='NO_EDIT',
                                     use_two_lines=False, editable=False, max_width=22)
         self.hosts_field = self.add(Hosts, fieldname="hosts",
                                     scroll_exit=True,  # allow them to exit using arrow keys

@@ -5,6 +5,26 @@
 import npyscreen
 from forms import SelectDPNetworks, SelectCores
 
+class WekaTheme(npyscreen.ThemeManager):
+
+    default_colors = {
+        'DEFAULT'     : 'WHITE_BLACK',
+        'FORMDEFAULT' : 'WHITE_BLACK',
+        'NO_EDIT'     : 'YELLOW_BLACK',
+        'STANDOUT'    : 'CYAN_BLACK',
+        'CURSOR'      : 'CYAN_BLACK',
+        'CURSOR_INVERSE': 'BLACK_CYAN',
+        'LABEL'       : 'GREEN_BLACK',
+        'LABELBOLD'   : 'GREEN_BLACK',
+        'CONTROL'     : 'YELLOW_BLACK',
+        'WARNING'     : 'RED_BLACK',
+        'CRITICAL'    : 'BLACK_RED',
+        'GOOD'        : 'GREEN_BLACK',
+        'GOODHL'      : 'GREEN_BLACK',
+        'VERYGOOD'    : 'BLACK_GREEN',
+        'CAUTION'     : 'YELLOW_BLACK',
+        'CAUTIONHL'   : 'BLACK_YELLOW',
+    }
 
 class WekaConfigApp(npyscreen.NPSAppManaged):
     STARTING_FORM = "SelectNetworks"
@@ -22,6 +42,7 @@ class WekaConfigApp(npyscreen.NPSAppManaged):
         super(WekaConfigApp, self).__init__()
 
     def onStart(self):
+        npyscreen.setTheme(WekaTheme)
         self.addForm("SelectNetworks", SelectDPNetworks, "Weka Configurator (Networks)")
         #self.addForm("Hosts", SelectHosts, "Weka Configurator (Hosts)")
         self.addForm("SelectCores", SelectCores, "Weka Configurator (Cores)")
