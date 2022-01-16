@@ -48,42 +48,55 @@ class SelectCores(PrevDoneForm):
         super(SelectCores, self).__init__(*args, help=help, **kwargs)
 
     def create(self):
-        self.title1 = self.add(npyscreen.FixedText, value="Host Configuration Reference",
-                                    color='NO_EDIT',
-                                    editable=False)
-        self.total_cores = self.add(WekaTitleFixedText, fieldname="cores",
-                                    label="Cores per host",
-                                    begin_entry_at=19)
-        self.total_drives = self.add(WekaTitleFixedText, fieldname="drives",
-                                     label="Drives per host",
-                                     begin_entry_at=19)
-        self.num_hosts_field = self.add(WekaTitleFixedText, fieldname="num_hosts",
-                                     label="Number of hosts",
-                                     begin_entry_at=19)
+        self.title1 = self.add(npyscreen.FixedText,
+                               value="Host Configuration Reference",
+                               color='NO_EDIT',
+                               editable=False)
+        self.total_cores = self.add(WekaTitleFixedText, label="Cores per host", entry_field_width=3)
+        self.total_drives = self.add(WekaTitleFixedText, label="Drives per host", entry_field_width=3)
+        self.num_hosts_field = self.add(WekaTitleFixedText, label="Number of hosts", entry_field_width=3)
         self.nextrely += 2 # skip 2 lines
-        self.usable_cores = self.add(UsableCoresWidget, fieldname="usable",
-                                     label="Total Weka Cores",
-                                     begin_entry_at=19)
+        self.usable_cores = self.add(UsableCoresWidget, label="Total Weka Cores", entry_field_width=2)
         self.nextrely += 1 # skip a line
-        self.fe_cores = self.add(FeCoresWidget, fieldname="fe",
-                                     label="FE Cores",
-                                     begin_entry_at=19)
-        self.drives_cores = self.add(DrivesCoresWidget, fieldname="drives",
-                                     label="DRIVES Cores",
-                                     begin_entry_at=19)
-        self.compute_cores = self.add(ComputeCoresWidget, fieldname="compute",
-                                      label="COMPUTE Cores",
-                                      begin_entry_at=19)
+        self.fe_cores = self.add(FeCoresWidget, label="FE Cores", entry_field_width=2)
+        self.drives_cores = self.add(DrivesCoresWidget, label="DRIVES Cores", entry_field_width=2)
+        self.compute_cores = self.add(ComputeCoresWidget, label="COMPUTE Cores", entry_field_width=2)
         self.nextrely += 1
-        self.name_field = self.add(NameWidget, fieldname="clustername",
-                                      label="Cluster Name",
-                                      begin_entry_at=19)
+        self.name_field = self.add(NameWidget, label="Cluster Name", entry_field_width=32)
         self.nextrely += 1
-        self.data_field = self.add(DataWidget, fieldname="data",
-                                      label="Data Drives",
-                                      begin_entry_at=19)
-        self.parity_field = self.add(ParityWidget, fieldname="parity",
-                                     label="Parity Drives", begin_entry_at=19)
+        self.data_field = self.add(DataWidget, label="Data Drives", entry_field_width=2)
+        self.parity_field = self.add(ParityWidget, label="Parity Drives", entry_field_width=2)
+
+        self.align_fields()
+
+
+    def align_fields(self):
+        """align the input fields so they all start at the same X offset & right-justify the label"""
+
+        # find how long the longest label is
+        longest_label = 0
+        for widget in self._widgets__:
+            if npyscreen.TitleText in widget.__class__.__mro__: # is this the right type of object?
+                widget.label_len = len(widget.label_widget.value)
+                if widget.label_len > longest_label:
+                    longest_label = widget.label_len
+
+        entry_field_starts_at = longest_label +1
+        for widget in self._widgets__:
+            if npyscreen.TitleText in widget.__class__.__mro__: # is this the right type of object?
+                # move the label to the right so that they all end at the same spot
+                relx_delta = longest_label - widget.label_len
+                widget.set_relyx(widget.rely, widget.relx + relx_delta)
+                # set where the entry field will be - note that it's relative to relx
+                widget.text_field_begin_at = entry_field_starts_at - relx_delta
+
+        # fix the field width
+        for widget in self._widgets__:
+            if npyscreen.TitleText in widget.__class__.__mro__: # is this the right type of object?
+                widget.width = widget.text_field_begin_at + widget.entry_field_width
+                widget.entry_widget.width = widget.entry_field_width +1
+                widget.entry_widget.request_width = widget.entry_field_width +1
+
 
     def beforeEditing(self):
         PA = self.parentApp
@@ -102,10 +115,12 @@ class SelectCores(PrevDoneForm):
         self.drives_cores.set_value(str(PA.selected_cores.drives))
 
         self.name_field.set_value(PA.clustername)
-        if PA.datadrives is None or \
-                (PA.datadrives + PA.paritydrives) > len(PA.selected_hosts):
+        if PA.datadrives is None or (PA.datadrives + PA.paritydrives) > len(PA.selected_hosts):
             PA.datadrives = len(PA.selected_hosts) - 2
             PA.paritydrives = 2
+
+        if PA.datadrives > 16:
+            PA.datadrives = 16
 
         self.data_field.set_value(str(PA.datadrives))
         self.parity_field.set_value(str(PA.paritydrives))

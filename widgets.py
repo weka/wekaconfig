@@ -4,6 +4,7 @@
 
 import curses.ascii
 import npyscreen
+from npyscreen import Textfield
 
 movement_help = """Cursor movement:
     arrow keys: up, down, left, right - move between and within fields
@@ -12,34 +13,94 @@ movement_help = """Cursor movement:
     """
 
 class WekaTitleText(npyscreen.TitleText):
-    def __init__(self, *args, label='', fieldname='', **keywords):
-        #keywords["use_two_lines"] = False
+    def __init__(self, *args, label='', entry_field_width=6, **keywords):
         label = label + ':'
-        label_width = keywords["begin_entry_at"] - keywords["relx"] +1
-        keywords["name"] = label.rjust(label_width, ' ')
+        keywords["name"] = label
+        keywords["use_two_lines"] = False
+        self.entry_field_width = entry_field_width
         super(WekaTitleText, self).__init__(*args, **keywords)
+        self.entry_widget.remove_complex_handler(self.entry_widget.t_input_isprint)
+        self.entry_widget.add_complex_handlers([(self.t_input_length, self.h_toss_input)])
+        self.entry_widget.add_complex_handlers([(self.entry_widget.t_input_isprint, self.entry_widget.h_addch)])
+        fred=2
+
+    def t_input_length(self, inp):
+        if len(self.value) >= self.entry_field_width:
+            curses.beep()
+            return True
+        return False
+
+    def h_toss_input(self, inp):
+        return True
 
 
-class WekaTitleNumeric(npyscreen.TitleNumeric):
-    def __init__(self, *args, label='', fieldname='', **keywords):
-        #keywords["use_two_lines"] = False
+class WekaTitleNumeric(npyscreen.TitleText):
+    def __init__(self, *args, label='', entry_field_width=6, **keywords):
         label = label + ':'
-        label_width = keywords["begin_entry_at"] - keywords["relx"] +1
-        keywords["name"] = label.rjust(label_width, ' ')
+        keywords["name"] = label
+        keywords["use_two_lines"] = False
+        self.entry_field_width = entry_field_width
         super(WekaTitleNumeric, self).__init__(*args, **keywords)
+        self.entry_widget.add_complex_handlers([(self.t_input_length, self.h_toss_input)])
+        self.entry_widget.add_complex_handlers([(self.t_input_isdigit, self.entry_widget.h_addch)])
+        self.entry_widget.remove_complex_handler(self.entry_widget.t_input_isprint)
+
+    def t_input_length(self, inp):
+        if len(self.value) >= self.entry_field_width:
+            curses.beep()
+            return True
+        return False
+
+    def h_toss_input(self, inp):
+        return True
+
+    # only allows numbers to be input (ie: 0 to 9)
+    def t_input_isdigit(self, inp):
+        import curses
+        if curses.ascii.isdigit(inp):
+            return True
+        else:
+            curses.beep()
+            return False
+
 
 class WekaTitleFixedText(npyscreen.TitleFixedText):
-    def __init__(self, *args, label='', fieldname='', **keywords):
-        #keywords["use_two_lines"] = False
+    def __init__(self, *args, label='', entry_field_width=6, **keywords):
         label = label + ':'
-        label_width = keywords["begin_entry_at"] - keywords["relx"] +1
-        keywords["name"] = label.rjust(label_width, ' ')
+        keywords["name"] = label
         keywords["labelColor"] = 'NO_EDIT'
         keywords["editable"] = False
+        keywords["use_two_lines"] = False
+        self.entry_field_width = entry_field_width
         super(WekaTitleFixedText, self).__init__(*args, **keywords)
 
+class NameWidget(WekaTitleText):
+    def __init__(self, *args, entry_field_width=6, **keywords):
+        self.entry_field_width = entry_field_width
+        keywords["entry_field_width"] = entry_field_width
+        super(NameWidget, self).__init__(*args, **keywords)
+        self.entry_widget.remove_complex_handler(self.entry_widget.t_input_isprint)
+        self.entry_widget.add_complex_handlers([(self.t_input_isname, self.entry_widget.h_addch)])
 
-#class CoresWidgetBase(npyscreen.TitleNumeric):
+    # only allows numbers to be input (ie: 0 to 9)
+    def t_input_isname(self, inp):
+        import curses
+
+        if curses.ascii.isspace(inp):
+            npyscreen.notify_wait("Only a-z,A-Z,0-9,-, and _ are allowed in names")
+            curses.beep()
+            return False
+        elif curses.ascii.isalnum(inp):
+            return True
+        elif inp == 0x5f or inp == 0x2d or inp == 0x2e:
+            return True
+        else:
+            curses.beep()
+            npyscreen.notify_wait("Only a-z,A-Z,0-9,.,-, and _ are allowed in names")
+            return False
+
+
+
 class CoresWidgetBase(WekaTitleNumeric):
     def __init__(self, *args, fieldname='', **keywords):
         self.fieldname = fieldname
@@ -157,6 +218,7 @@ class ParityWidget(DataParityBase):
         PA.paritydrives = self.intval
 
 
+"""
 class NonEmptyfield(npyscreen.Textfield):
     def __init__(self, *args, **keywords):
         super(NonEmptyfield, self).__init__(*args, **keywords)
@@ -166,8 +228,13 @@ class NonEmptyfield(npyscreen.Textfield):
     # only allows numbers to be input (ie: 0 to 9)
     def t_input_isname(self, inp):
         import curses
+        if len(self.value) >= self.entry_field_width:
+            curses.beep()
+            return True
+
         if curses.ascii.isspace(inp):
             npyscreen.notify_wait("Only a-z,A-Z,0-9,-, and _ are allowed in names")
+            curses.beep()
             return False
         elif curses.ascii.isalnum(inp):
             return True
@@ -176,6 +243,7 @@ class NonEmptyfield(npyscreen.Textfield):
         elif curses.ascii.ispunct(inp):
             return True
         else:
+            curses.beep()
             npyscreen.notify_wait("Only a-z,A-Z,0-9,.,-, and _ are allowed in names")
             return False
 
@@ -189,9 +257,11 @@ class TitleNonEmpty(WekaTitleText):
 
 
 class NameWidget(TitleNonEmpty):
-    def __init__(self, *args, fieldname='', **keywords):
-        self.fieldname = fieldname
+    #def __init__(self, *args, fieldname='', **keywords):
+        #self.fieldname = fieldname
+    def __init__(self, *args, entry_field_width=32, **keywords):
         self.last_value = None
+        keywords["entry_field_width"] = entry_field_width
         super(NameWidget, self).__init__(*args, **keywords)
         pass
 
@@ -201,5 +271,4 @@ class NameWidget(TitleNonEmpty):
         else:
             npyscreen.notify_wait("Please enter a name")
             return False
-
-
+"""
