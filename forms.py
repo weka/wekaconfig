@@ -48,26 +48,26 @@ class PrevDoneForm(WekaActionForm):
         super(PrevDoneForm, self).__init__(*args, **keywords)
 
 
-class SelectCores(PrevDoneForm):
+class SelectCoresForm(PrevDoneForm):
     def __init__(self, *args, **kwargs):
         help = """Select the number of FE, COMPUTE, and DRIVES cores for your cluster.\n\n"""
         help = help + movement_help
-        super(SelectCores, self).__init__(*args, help=help, **kwargs)
+        super(SelectCoresForm, self).__init__(*args, help=help, **kwargs)
 
     def create(self):
         self.title1 = self.add(npyscreen.FixedText,
                                value="Host Configuration Reference",
                                color='NO_EDIT',
                                editable=False)
-        self.total_cores = self.add(WekaTitleFixedText, label="Cores per host", entry_field_width=3)
-        self.total_drives = self.add(WekaTitleFixedText, label="Drives per host", entry_field_width=3)
+        self.total_cores_field = self.add(WekaTitleFixedText, label="Cores per host", entry_field_width=3)
+        self.total_drives_field = self.add(WekaTitleFixedText, label="Drives per host", entry_field_width=3)
         self.num_hosts_field = self.add(WekaTitleFixedText, label="Number of hosts", entry_field_width=3)
         self.nextrely += 2 # skip 2 lines
-        self.usable_cores = self.add(UsableCoresWidget, label="Total Weka Cores", entry_field_width=2)
+        self.usable_cores_field = self.add(UsableCoresWidget, label="Total Weka Cores", entry_field_width=2)
         self.nextrely += 1 # skip a line
-        self.fe_cores = self.add(FeCoresWidget, label="FE Cores", entry_field_width=2)
-        self.drives_cores = self.add(DrivesCoresWidget, label="DRIVES Cores", entry_field_width=2)
-        self.compute_cores = self.add(ComputeCoresWidget, label="COMPUTE Cores", entry_field_width=2)
+        self.fe_cores_field = self.add(FeCoresWidget, label="FE Cores", entry_field_width=2)
+        self.drives_cores_field = self.add(DrivesCoresWidget, label="DRIVES Cores", entry_field_width=2)
+        self.compute_cores_field = self.add(ComputeCoresWidget, label="COMPUTE Cores", entry_field_width=2)
         self.nextrely += 1
         self.name_field = self.add(NameWidget, label="Cluster Name", entry_field_width=32)
         self.nextrely += 1
@@ -81,16 +81,16 @@ class SelectCores(PrevDoneForm):
             "Auto Failure Domain",
             "Cloud Enable"
         ]
-        self.misc = self.add(npyscreen.TitleMultiSelect,
-                                scroll_exit=True,  # allow them to exit using arrow keys
-                                use_two_lines=True,  # input fields start on 2nd line
-                                rely=2,  # put it high on the screen
-                                relx=39,  # place to the right of Networks (above)
-                                begin_entry_at=2,  # make the list under the title
-                                name='Misc:',
-                                values=self.misc_values,  # field labels
-                                value=[]    # which are selected
-                             )
+        self.misc_field = self.add(npyscreen.TitleMultiSelect,
+                                   scroll_exit=True,  # allow them to exit using arrow keys
+                                   use_two_lines=True,  # input fields start on 2nd line
+                                   rely=2,  # put it high on the screen
+                                   relx=39,  # place to the right of Networks (above)
+                                   begin_entry_at=2,  # make the list under the title
+                                   name='Misc:',
+                                   values=self.misc_values,  # field labels
+                                   value=[]  # which are selected
+                                   )
 
                                 # values=["01234567890123456789012345678901234567890123456789", # testing
                                 #        "          1         2         3         4"] ) # testing
@@ -128,16 +128,16 @@ class SelectCores(PrevDoneForm):
         if PA.selected_cores is None:
             self.num_cores = self.analyse_cores()
             self.num_drives = self.analyse_drives()
-            self.parentApp.selected_cores = Cores(self.num_cores, self.num_drives)
+            PA.selected_cores = Cores(self.num_cores, self.num_drives)
 
-        self.parentApp.selected_cores.recalculate()
-        self.total_cores.set_value(str(self.num_cores))
-        self.total_drives.set_value(str(self.num_drives))
+        PA.selected_cores.recalculate()
+        self.total_cores_field.set_value(str(self.num_cores))
+        self.total_drives_field.set_value(str(self.num_drives))
         self.num_hosts_field.set_value(str(len(PA.selected_hosts)))
-        self.usable_cores.set_value(str(PA.selected_cores.usable))
-        self.fe_cores.set_value(str(PA.selected_cores.fe))
-        self.compute_cores.set_value(str(PA.selected_cores.compute))
-        self.drives_cores.set_value(str(PA.selected_cores.drives))
+        self.usable_cores_field.set_value(str(PA.selected_cores.usable))
+        self.fe_cores_field.set_value(str(PA.selected_cores.fe))
+        self.compute_cores_field.set_value(str(PA.selected_cores.compute))
+        self.drives_cores_field.set_value(str(PA.selected_cores.drives))
 
         self.name_field.set_value(PA.clustername)
         if PA.datadrives is None or (PA.datadrives + PA.paritydrives) > len(PA.selected_hosts):
@@ -149,20 +149,21 @@ class SelectCores(PrevDoneForm):
 
         self.data_field.set_value(str(PA.datadrives))
         self.parity_field.set_value(str(PA.paritydrives))
-        self.misc.set_value(PA.misc)
+        self.misc_field.set_value(PA.misc)
 
     def save_values(self):
-        self.parentApp.selected_cores.usable = int(self.usable_cores.value)
-        self.parentApp.selected_cores.fe = int(self.fe_cores.value)
-        self.parentApp.selected_cores.compute = int(self.compute_cores.value)
-        self.parentApp.selected_cores.drives = int(self.drives_cores.value)
-        self.parentApp.clustername = self.name_field.value
-        self.parentApp.datadrives = int(self.data_field.value)
-        self.parentApp.paritydrives = int(self.parity_field.value)
-        self.parentApp.misc = self.misc.value
-        self.parentApp.dedicated = True if 0 in self.misc.value else False
-        self.parentApp.auto_failure_domain = True if 1 in self.misc.value else False
-        self.parentApp.cloud_enable = True if 2 in self.misc.value else False
+        PA = self.parentApp
+        PA.selected_cores.usable = int(self.usable_cores_field.value)
+        PA.selected_cores.fe = int(self.fe_cores_field.value)
+        PA.selected_cores.compute = int(self.compute_cores_field.value)
+        PA.selected_cores.drives = int(self.drives_cores_field.value)
+        PA.clustername = self.name_field.value
+        PA.datadrives = int(self.data_field.value)
+        PA.paritydrives = int(self.parity_field.value)
+        PA.misc = self.misc_field.value
+        PA.dedicated = True if 0 in self.misc_field.value else False
+        PA.auto_failure_domain = True if 1 in self.misc_field.value else False
+        PA.cloud_enable = True if 2 in self.misc_field.value else False
 
     def on_ok(self):
         # The next two lines terminate the app cleanly, so we should generate the config
@@ -227,7 +228,6 @@ class SelectCores(PrevDoneForm):
 class Hosts(npyscreen.TitleMultiSelect):
     def when_value_edited(self):
         parent = self.parent
-        #PA = parent.parentApp
         # update the "Number of hosts" field on the lower-left
         parent.num_hosts_field.set_value('  '+str(len(parent.hosts_field.value)))
         parent.num_hosts_field.display()
@@ -237,7 +237,7 @@ class Networks(npyscreen.TitleMultiSelect):
     def when_value_edited(self):
         PA = self.parent.parentApp
         PA.selected_dps = list()  # clear the list
-        for index in self.parent.dataplane_networks.value:
+        for index in self.parent.dataplane_networks_field.value:
             # save the IPv4Network objects corresponding to the selected items
             PA.selected_dps.append(self.parent.nets[index])
         self.parent.analyze_networks()
@@ -255,26 +255,26 @@ class Networks(npyscreen.TitleMultiSelect):
             return False
         return True
 
-class SelectDPNetworks(CancelNextForm):
+class SelectHostsForm(CancelNextForm):
     def __init__(self, *args, **kwargs):
         self.help = """Select the hosts that will be in your cluster.\n\n"""
         self.help = self.help + movement_help
-        super(SelectDPNetworks, self).__init__(*args, help=self.help, **kwargs)
+        super(SelectHostsForm, self).__init__(*args, help=self.help, **kwargs)
 
     def create(self):
         self.sorted_hosts = list()
         self.possible_dps = self.guess_networks(self.parentApp.target_hosts)
         # what happens when there's only 1 possible dp network?
-        self.dataplane_networks = self.add(Networks, fieldname="networks",
-                                   scroll_exit=True, # allow them to exit using arrow keys
-                                   max_height=15,    # not too big - need room below for next field
-                                   use_two_lines=True, # input fields start on 2nd line
-                                   rely=2, # put it high on the screen
-                                   max_width=38, # leave room to the right for hosts entry
-                                   begin_entry_at=2, # make the list under the title
-                                   name='Select DP Networks:',  # label/title
-                                   #values=["255.255.255.255/32 - 200 Gbps"]) # testing
-                                   values=self.possible_dps)
+        self.dataplane_networks_field = self.add(Networks, fieldname="networks",
+                                                 scroll_exit=True,  # allow them to exit using arrow keys
+                                                 max_height=15,  # not too big - need room below for next field
+                                                 use_two_lines=True,  # input fields start on 2nd line
+                                                 rely=2,  # put it high on the screen
+                                                 max_width=38,  # leave room to the right for hosts entry
+                                                 begin_entry_at=2,  # make the list under the title
+                                                 name='Select DP Networks:',  # label/title
+                                                 #values=["255.255.255.255/32 - 200 Gbps"]) # testing
+                                                 values=self.possible_dps)
 
         self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts", name="Number of Hosts:",
                                     labelColor='NO_EDIT',
@@ -288,7 +288,6 @@ class SelectDPNetworks(CancelNextForm):
                                     name='Select Hosts:')
                                     #values=["01234567890123456789012345678901234567890123456789", # testing
                                     #        "          1         2         3         4"] ) # testing
-        fred = 1
 
     def on_ok(self):
         PA = self.parentApp
@@ -300,7 +299,7 @@ class SelectDPNetworks(CancelNextForm):
         for index in self.hosts_field.value:  # an index into the orig list, ie: [0,2,4,6,7]
             PA.selected_hosts[PA.sorted_hosts[index]] = PA.possible_hosts[PA.sorted_hosts[index]]
 
-        PA.setNextForm("SelectCores")
+        PA.setNextForm("SelectCoresForm")
 
     def on_cancel(self):
         self.parentApp.setNextForm(None)  # prev on this form will exit program

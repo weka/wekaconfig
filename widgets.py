@@ -138,9 +138,9 @@ class CoresWidgetBase(WekaTitleNumeric):
         """update the parent"""
         PA = self.parent.parentApp
         PA.selected_cores.recalculate()
-        self.parent.fe_cores.set_value(str(PA.selected_cores.fe))
-        self.parent.compute_cores.set_value(str(PA.selected_cores.compute))
-        self.parent.drives_cores.set_value(str(PA.selected_cores.drives))
+        self.parent.fe_cores_field.set_value(str(PA.selected_cores.fe))
+        self.parent.compute_cores_field.set_value(str(PA.selected_cores.compute))
+        self.parent.drives_cores_field.set_value(str(PA.selected_cores.drives))
 
     def check_value(self):
         # override me

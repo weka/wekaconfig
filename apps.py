@@ -3,7 +3,7 @@
 ################################################################################################
 
 import npyscreen
-from forms import SelectDPNetworks, SelectCores
+from forms import SelectHostsForm, SelectCoresForm
 
 class WekaTheme(npyscreen.ThemeManager):
 
@@ -28,7 +28,7 @@ class WekaTheme(npyscreen.ThemeManager):
     }
 
 class WekaConfigApp(npyscreen.NPSAppManaged):
-    STARTING_FORM = "SelectNetworks"
+    STARTING_FORM = "SelectHostsForm"
 
     def __init__(self, hostlist):
         self.target_hosts = hostlist  # STEMHost objects
@@ -48,9 +48,9 @@ class WekaConfigApp(npyscreen.NPSAppManaged):
 
     def onStart(self):
         npyscreen.setTheme(WekaTheme)
-        self.addForm("SelectNetworks", SelectDPNetworks, "Weka Configurator (Networks)")
+        self.addForm("SelectHostsForm", SelectHostsForm, "Weka Configurator (Hosts)")
         #self.addForm("Hosts", SelectHosts, "Weka Configurator (Hosts)")
-        self.addForm("SelectCores", SelectCores, "Weka Configurator (Cores)")
+        self.addForm("SelectCoresForm", SelectCoresForm, "Weka Configurator (Cores)")
         fred = 1
 
     # on exit of application - when next form is None
