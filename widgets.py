@@ -3,8 +3,8 @@
 ################################################################################################
 
 import curses.ascii
+
 import npyscreen
-from npyscreen import Textfield
 
 movement_help = """Cursor movement:
     arrow keys: up, down, left, right - move between and within fields
@@ -12,7 +12,10 @@ movement_help = """Cursor movement:
     Tab: move to next field
     """
 
+
 class WekaTitleText(npyscreen.TitleText):
+    """Label:text input field"""
+
     def __init__(self, *args, label='', entry_field_width=6, **keywords):
         label = label + ':'
         keywords["name"] = label
@@ -22,7 +25,7 @@ class WekaTitleText(npyscreen.TitleText):
         self.entry_widget.remove_complex_handler(self.entry_widget.t_input_isprint)
         self.entry_widget.add_complex_handlers([(self.t_input_length, self.h_toss_input)])
         self.entry_widget.add_complex_handlers([(self.entry_widget.t_input_isprint, self.entry_widget.h_addch)])
-        fred=2
+        fred = 2
 
     def t_input_length(self, inp):
         if len(self.value) >= self.entry_field_width:
@@ -35,6 +38,8 @@ class WekaTitleText(npyscreen.TitleText):
 
 
 class WekaTitleNumeric(npyscreen.TitleText):
+    """Label:numeric input field"""
+
     def __init__(self, *args, label='', entry_field_width=6, **keywords):
         label = label + ':'
         keywords["name"] = label
@@ -65,6 +70,8 @@ class WekaTitleNumeric(npyscreen.TitleText):
 
 
 class WekaTitleFixedText(npyscreen.TitleFixedText):
+    """Label: value (non-input/no editing) field"""
+
     def __init__(self, *args, label='', entry_field_width=6, **keywords):
         label = label + ':'
         keywords["name"] = label
@@ -74,7 +81,10 @@ class WekaTitleFixedText(npyscreen.TitleFixedText):
         self.entry_field_width = entry_field_width
         super(WekaTitleFixedText, self).__init__(*args, **keywords)
 
+
 class NameWidget(WekaTitleText):
+    """Label: name (as in hostname, clustername, etc) field"""
+
     def __init__(self, *args, entry_field_width=6, **keywords):
         self.entry_field_width = entry_field_width
         keywords["entry_field_width"] = entry_field_width
@@ -100,8 +110,9 @@ class NameWidget(WekaTitleText):
             return False
 
 
-
 class CoresWidgetBase(WekaTitleNumeric):
+    """helper base class for weka cores input"""
+
     def __init__(self, *args, fieldname='', **keywords):
         self.fieldname = fieldname
         self.last_value = None
@@ -124,6 +135,7 @@ class CoresWidgetBase(WekaTitleNumeric):
         return True
 
     def set_values(self):
+        """update the parent"""
         PA = self.parent.parentApp
         PA.selected_cores.recalculate()
         self.parent.fe_cores.set_value(str(PA.selected_cores.fe))
@@ -136,6 +148,8 @@ class CoresWidgetBase(WekaTitleNumeric):
 
 
 class UsableCoresWidget(CoresWidgetBase):
+    """specifically for total usable cores"""
+
     def check_value(self):
         if self.intval not in range(1, 20):
             return "Please enter a number between 1 and 19"
@@ -144,6 +158,8 @@ class UsableCoresWidget(CoresWidgetBase):
 
 
 class FeCoresWidget(CoresWidgetBase):
+    """specific for FrontEnd cores"""
+
     def check_value(self):
         PA = self.parent.parentApp
         if self.intval > PA.selected_cores.usable:
@@ -155,6 +171,8 @@ class FeCoresWidget(CoresWidgetBase):
 
 
 class DrivesCoresWidget(CoresWidgetBase):
+    """specific for Drives cores"""
+
     def check_value(self):
         PA = self.parent.parentApp
         if self.intval > PA.selected_cores.usable:
@@ -168,6 +186,8 @@ class DrivesCoresWidget(CoresWidgetBase):
 
 
 class ComputeCoresWidget(CoresWidgetBase):
+    """specific for Compute cores"""
+
     def check_value(self):
         PA = self.parent.parentApp
 
@@ -180,6 +200,8 @@ class ComputeCoresWidget(CoresWidgetBase):
 
 
 class DataParityBase(CoresWidgetBase):
+    """helper for data/parity drives input"""
+
     def check_value(self):
         PA = self.parent.parentApp
         self.clustersize = len(PA.selected_hosts)
@@ -195,6 +217,8 @@ class DataParityBase(CoresWidgetBase):
 
 
 class DataWidget(DataParityBase):
+    """specific for data drives input"""
+
     def _check_value(self):
         if self.intval not in range(3, self.clustersize - 1):
             return f"Data drives must be between 3 and {self.clustersize - 2}"
@@ -206,6 +230,8 @@ class DataWidget(DataParityBase):
 
 
 class ParityWidget(DataParityBase):
+    """specific for parity drives input"""
+
     def _check_value(self):
         if self.intval == 4 and self.clustersize <= 8:
             return "Parity of 4 can only be used with clusters with more than 8 hosts"
@@ -216,59 +242,3 @@ class ParityWidget(DataParityBase):
     def set_values(self):
         PA = self.parent.parentApp
         PA.paritydrives = self.intval
-
-
-"""
-class NonEmptyfield(npyscreen.Textfield):
-    def __init__(self, *args, **keywords):
-        super(NonEmptyfield, self).__init__(*args, **keywords)
-        self.add_complex_handlers([(self.t_input_isname, self.h_addch)])
-        self.remove_complex_handler(self.t_input_isprint)
-
-    # only allows numbers to be input (ie: 0 to 9)
-    def t_input_isname(self, inp):
-        import curses
-        if len(self.value) >= self.entry_field_width:
-            curses.beep()
-            return True
-
-        if curses.ascii.isspace(inp):
-            npyscreen.notify_wait("Only a-z,A-Z,0-9,-, and _ are allowed in names")
-            curses.beep()
-            return False
-        elif curses.ascii.isalnum(inp):
-            return True
-        elif curses.ascii.isdigit(inp):
-            return True
-        elif curses.ascii.ispunct(inp):
-            return True
-        else:
-            curses.beep()
-            npyscreen.notify_wait("Only a-z,A-Z,0-9,.,-, and _ are allowed in names")
-            return False
-
-
-class TitleNonEmpty(WekaTitleText):
-    _entry_type = NonEmptyfield
-
-    def __init__(self, *args, **keywords):
-        self.last_value = None
-        super(TitleNonEmpty, self).__init__(*args, **keywords)
-
-
-class NameWidget(TitleNonEmpty):
-    #def __init__(self, *args, fieldname='', **keywords):
-        #self.fieldname = fieldname
-    def __init__(self, *args, entry_field_width=32, **keywords):
-        self.last_value = None
-        keywords["entry_field_width"] = entry_field_width
-        super(NameWidget, self).__init__(*args, **keywords)
-        pass
-
-    def safe_to_exit(self):
-        if len(self.value) > 0:
-            return True
-        else:
-            npyscreen.notify_wait("Please enter a name")
-            return False
-"""

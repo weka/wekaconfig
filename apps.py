@@ -39,6 +39,10 @@ class WekaConfigApp(npyscreen.NPSAppManaged):
         self.datadrives = None
         self.paritydrives = None
         self.cleanexit = False
+        self.misc = None
+        self.dedicated = None
+        self.auto_failure_domain = None
+        self.cloud_enable = None
 
         super(WekaConfigApp, self).__init__()
 
@@ -47,6 +51,7 @@ class WekaConfigApp(npyscreen.NPSAppManaged):
         self.addForm("SelectNetworks", SelectDPNetworks, "Weka Configurator (Networks)")
         #self.addForm("Hosts", SelectHosts, "Weka Configurator (Hosts)")
         self.addForm("SelectCores", SelectCores, "Weka Configurator (Cores)")
+        fred = 1
 
     # on exit of application - when next form is None
     # def onCleanExit(self):

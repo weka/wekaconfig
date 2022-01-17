@@ -71,6 +71,8 @@ class WekaCluster(object):
         return result
 
     def _dedicate(self):
+        if not self.config.dedicated:
+            return []
         base = 'host dedicate '
         #host_id = 0
         result = list()
@@ -87,23 +89,32 @@ class WekaCluster(object):
         return result
 
     def _failure_domain(self):
-        base = 'host failure-domain '
-        #host_id = 0
-        result = list()
-        for hostname, host in sorted(self.config.selected_hosts.items()):
-            thishost = base + str(host.host_id) + ' --auto'
-            result.append(thishost)
-            #host_id += 1
-        return result
+        if self.config.auto_failure_domain:
+            base = 'host failure-domain '
+            #host_id = 0
+            result = list()
+            for hostname, host in sorted(self.config.selected_hosts.items()):
+                thishost = base + str(host.host_id) + ' --auto'
+                result.append(thishost)
+                #host_id += 1
+            return result
+        else:
+            return []
 
     def _hot_spare(self):
         return "hot-spare 1"
 
     def _cloud(self):
-        return "cloud enable"
+        if self.config.cloud_enable:
+            return "cloud enable"
+        else:
+            return None
 
     def _name(self):
-        return f"update --cluster-name={self.config.clustername}"
+        if len(self.config.clustername) > 0:
+            return f"update --cluster-name={self.config.clustername}"
+        else:
+            return None
 
     def _apply(self):
         return "host apply --all --force"
@@ -130,8 +141,12 @@ class WekaCluster(object):
             for item in self._failure_domain():
                 fp.write(WEKA_CLUSTER + item + NL)
             fp.write(WEKA_CLUSTER + self._hot_spare() + NL)
-            fp.write(WEKA + self._cloud() + NL)
-            fp.write(WEKA_CLUSTER + self._name() + NL)
+            cloud = self._cloud()
+            if cloud is not None:
+                fp.write(WEKA + cloud + NL)
+            name = self._name()
+            if name is not None:
+                fp.write(WEKA_CLUSTER + name + NL)
             fp.write(WEKA_CLUSTER + self._apply() + NL)
             fp.write("sleep 60\n")
             fp.write(WEKA_CLUSTER + self._start_io() + NL)

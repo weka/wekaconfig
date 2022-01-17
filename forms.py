@@ -17,7 +17,14 @@ movement_help = """Cursor movement:
     Tab: move to next field
     """
 
-class CancelNextForm(npyscreen.ActionFormV2):
+class WekaActionForm(npyscreen.ActionFormV2):
+    def pre_edit_loop(self):
+        if not self.preserve_selected_widget:
+            self.editw = 0
+        if not self._widgets__[self.editw].editable:
+            self.find_next_editable()
+
+class CancelNextForm(WekaActionForm):
     OK_BUTTON_TEXT = "Next"
     CANCEL_BUTTON_TEXT = "Cancel"
 
@@ -25,7 +32,7 @@ class CancelNextForm(npyscreen.ActionFormV2):
         super(CancelNextForm, self).__init__(*args, **keywords)
 
 
-class PrevNextForm(npyscreen.ActionFormV2):
+class PrevNextForm(WekaActionForm):
     OK_BUTTON_TEXT = "Next"
     CANCEL_BUTTON_TEXT = "Prev"
 
@@ -33,7 +40,7 @@ class PrevNextForm(npyscreen.ActionFormV2):
         super(PrevNextForm, self).__init__(*args, **keywords)
 
 
-class PrevDoneForm(npyscreen.ActionFormV2):
+class PrevDoneForm(WekaActionForm):
     OK_BUTTON_TEXT = "Done"
     CANCEL_BUTTON_TEXT = "Prev"
 
@@ -69,6 +76,24 @@ class SelectCores(PrevDoneForm):
 
         self.align_fields()
 
+        self.misc_values = [
+            "Dedicated",
+            "Auto Failure Domain",
+            "Cloud Enable"
+        ]
+        self.misc = self.add(npyscreen.TitleMultiSelect,
+                                scroll_exit=True,  # allow them to exit using arrow keys
+                                use_two_lines=True,  # input fields start on 2nd line
+                                rely=2,  # put it high on the screen
+                                relx=39,  # place to the right of Networks (above)
+                                begin_entry_at=2,  # make the list under the title
+                                name='Misc:',
+                                values=self.misc_values,  # field labels
+                                value=[]    # which are selected
+                             )
+
+                                # values=["01234567890123456789012345678901234567890123456789", # testing
+                                #        "          1         2         3         4"] ) # testing
 
     def align_fields(self):
         """align the input fields so they all start at the same X offset & right-justify the label"""
@@ -124,8 +149,9 @@ class SelectCores(PrevDoneForm):
 
         self.data_field.set_value(str(PA.datadrives))
         self.parity_field.set_value(str(PA.paritydrives))
+        self.misc.set_value(PA.misc)
 
-    def on_ok(self):
+    def save_values(self):
         self.parentApp.selected_cores.usable = int(self.usable_cores.value)
         self.parentApp.selected_cores.fe = int(self.fe_cores.value)
         self.parentApp.selected_cores.compute = int(self.compute_cores.value)
@@ -133,11 +159,19 @@ class SelectCores(PrevDoneForm):
         self.parentApp.clustername = self.name_field.value
         self.parentApp.datadrives = int(self.data_field.value)
         self.parentApp.paritydrives = int(self.parity_field.value)
+        self.parentApp.misc = self.misc.value
+        self.parentApp.dedicated = True if 0 in self.misc.value else False
+        self.parentApp.auto_failure_domain = True if 1 in self.misc.value else False
+        self.parentApp.cloud_enable = True if 2 in self.misc.value else False
+
+    def on_ok(self):
         # The next two lines terminate the app cleanly, so we should generate the config
+        self.save_values()
         self.parentApp.setNextForm(None)
         self.parentApp.cleanexit = True
 
     def on_cancel(self):
+        self.save_values()
         self.parentApp.switchFormPrevious()  # go to previous screen; they hit 'Prev'
         # self.pressed = "PREV"  # actually Prev
 
@@ -194,14 +228,13 @@ class Hosts(npyscreen.TitleMultiSelect):
     def when_value_edited(self):
         parent = self.parent
         #PA = parent.parentApp
+        # update the "Number of hosts" field on the lower-left
         parent.num_hosts_field.set_value('  '+str(len(parent.hosts_field.value)))
         parent.num_hosts_field.display()
 
 
 class Networks(npyscreen.TitleMultiSelect):
     def when_value_edited(self):
-        value = self.parent.dataplane_networks.value
-        nets = self.parent.nets
         PA = self.parent.parentApp
         PA.selected_dps = list()  # clear the list
         for index in self.parent.dataplane_networks.value:
@@ -214,12 +247,10 @@ class Networks(npyscreen.TitleMultiSelect):
         if hasattr(self.parent, "hosts_field"):
             self.parent.hosts_field.set_value(PA.hosts_value)
             self.parent.hosts_field.set_values(sorted(PA.sorted_hosts))
-            #self.parent.hosts_field.display()
         self.parent.num_hosts_field.set_value('  ' + str(len(PA.hosts_value)))
         self.parent.display()
 
     def safe_to_exit(self):
-        pass
         if len(self.parent.parentApp.selected_dps) == 0:
             return False
         return True
@@ -257,25 +288,9 @@ class SelectDPNetworks(CancelNextForm):
                                     name='Select Hosts:')
                                     #values=["01234567890123456789012345678901234567890123456789", # testing
                                     #        "          1         2         3         4"] ) # testing
+        fred = 1
 
     def on_ok(self):
-        """
-        if len(self.dataplane_networks.value) == 0:
-            # they didn't select any
-            npyscreen.notify_wait("You must select at least one dataplane network", title='ERROR')
-            self.parentApp.setNextForm("SelectNetworks")
-            return
-        self.parentApp.selected_dps = list()  # clear the list
-        for index in self.dataplane_networks.value:
-            # save the IPv4Network objects corresponding to the selected items
-            self.parentApp.selected_dps.append(self.nets[index])
-        self.analyze_networks()
-        self.parentApp.possible_hosts, self.parentApp.excluded_hosts = logic.filter_hosts(self.parentApp.selected_dps,
-                                                                 self.parentApp.target_hosts)
-        self.parentApp.sorted_hosts = sorted(self.parentApp.possible_hosts.keys())  # list of names, not STEMHost objects
-        self.parentApp.hosts_value = list(range(0, len(self.parentApp.sorted_hosts)))
-        self.parentApp.setNextForm("SelectCores")
-        """
         PA = self.parentApp
         PA.selected_hosts = dict()  # toss any old values
         if len(self.hosts_field.value) < 5:
@@ -288,7 +303,6 @@ class SelectDPNetworks(CancelNextForm):
         PA.setNextForm("SelectCores")
 
     def on_cancel(self):
-        # self.pressed = "PREV"
         self.parentApp.setNextForm(None)  # prev on this form will exit program
 
     def analyze_networks(self):
