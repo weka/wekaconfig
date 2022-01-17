@@ -27,8 +27,11 @@ class WekaTheme(npyscreen.ThemeManager):
         'BOLD': 'WHITE_BLACK', # basically, no bold
     }
 
+#
+# the base app - this is the entrypoint to the UI
+#
 class WekaConfigApp(npyscreen.NPSAppManaged):
-    STARTING_FORM = "SelectHostsForm"
+    STARTING_FORM = "SelectHostsForm"   # the first form to display
 
     def __init__(self, hostlist):
         self.target_hosts = hostlist  # STEMHost objects
@@ -51,8 +54,7 @@ class WekaConfigApp(npyscreen.NPSAppManaged):
         self.addForm("SelectHostsForm", SelectHostsForm, "Weka Configurator (Hosts)")
         #self.addForm("Hosts", SelectHosts, "Weka Configurator (Hosts)")
         self.addForm("SelectCoresForm", SelectCoresForm, "Weka Configurator (Cores)")
-        fred = 1
 
     # on exit of application - when next form is None
-    # def onCleanExit(self):
-    #    print(f"selected dp networks are: {self.selected_dps}")
+    def onCleanExit(self):
+        pass    # We might want to do something here; perhaps move the output task here?

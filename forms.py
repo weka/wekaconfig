@@ -1,13 +1,13 @@
 ################################################################################################
 # Forms
 ################################################################################################
+# These forms define what pages the user sees
 
 import npyscreen
 
 import logic
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
-                    NameWidget, DataWidget, ParityWidget, WekaTitleText, WekaTitleNumeric, \
-                    WekaTitleFixedText
+    NameWidget, DataWidget, ParityWidget, WekaTitleFixedText, Networks, Hosts
 
 from logic import Cores
 
@@ -17,6 +17,7 @@ movement_help = """Cursor movement:
     Tab: move to next field
     """
 
+# base classes
 class WekaActionForm(npyscreen.ActionFormV2):
     def pre_edit_loop(self):
         if not self.preserve_selected_widget:
@@ -48,6 +49,7 @@ class PrevDoneForm(WekaActionForm):
         super(PrevDoneForm, self).__init__(*args, **keywords)
 
 
+# a form that lets the user select core configuration and data/parity and some options
 class SelectCoresForm(PrevDoneForm):
     def __init__(self, *args, **kwargs):
         help = """Select the number of FE, COMPUTE, and DRIVES cores for your cluster.\n\n"""
@@ -125,12 +127,13 @@ class SelectCoresForm(PrevDoneForm):
 
     def beforeEditing(self):
         PA = self.parentApp
-        if PA.selected_cores is None:
+        if PA.selected_cores is None:   # if we haven't visited this form before
             self.num_cores = self.analyse_cores()
             self.num_drives = self.analyse_drives()
             PA.selected_cores = Cores(self.num_cores, self.num_drives)
 
-        PA.selected_cores.recalculate()
+        PA.selected_cores.recalculate() # make sure they make sense
+        # repopulate the data to make sure it's correct on the screen
         self.total_cores_field.set_value(str(self.num_cores))
         self.total_drives_field.set_value(str(self.num_drives))
         self.num_hosts_field.set_value(str(len(PA.selected_hosts)))
@@ -151,6 +154,7 @@ class SelectCoresForm(PrevDoneForm):
         self.parity_field.set_value(str(PA.paritydrives))
         self.misc_field.set_value(PA.misc)
 
+    # save the values that are on the screen so we can repopulate it later
     def save_values(self):
         PA = self.parentApp
         PA.selected_cores.usable = int(self.usable_cores_field.value)
@@ -165,16 +169,17 @@ class SelectCoresForm(PrevDoneForm):
         PA.auto_failure_domain = True if 1 in self.misc_field.value else False
         PA.cloud_enable = True if 2 in self.misc_field.value else False
 
+    # this happens when they hit the OK button
     def on_ok(self):
         # The next two lines terminate the app cleanly, so we should generate the config
         self.save_values()
         self.parentApp.setNextForm(None)
         self.parentApp.cleanexit = True
 
+    # this happens when they hit the Cancel/Previous button
     def on_cancel(self):
         self.save_values()
         self.parentApp.switchFormPrevious()  # go to previous screen; they hit 'Prev'
-        # self.pressed = "PREV"  # actually Prev
 
     def analyse_cores(self):
         # let's gather together the info
@@ -225,36 +230,8 @@ class SelectCoresForm(PrevDoneForm):
 
         return reference_drives
 
-class Hosts(npyscreen.TitleMultiSelect):
-    def when_value_edited(self):
-        parent = self.parent
-        # update the "Number of hosts" field on the lower-left
-        parent.num_hosts_field.set_value('  '+str(len(parent.hosts_field.value)))
-        parent.num_hosts_field.display()
 
-
-class Networks(npyscreen.TitleMultiSelect):
-    def when_value_edited(self):
-        PA = self.parent.parentApp
-        PA.selected_dps = list()  # clear the list
-        for index in self.parent.dataplane_networks_field.value:
-            # save the IPv4Network objects corresponding to the selected items
-            PA.selected_dps.append(self.parent.nets[index])
-        self.parent.analyze_networks()
-        PA.possible_hosts, PA.excluded_hosts = logic.filter_hosts(PA.selected_dps, PA.target_hosts)
-        PA.sorted_hosts = sorted(PA.possible_hosts.keys())  # list of names, not STEMHost objects
-        PA.hosts_value = list(range(0, len(PA.sorted_hosts)))
-        if hasattr(self.parent, "hosts_field"):
-            self.parent.hosts_field.set_value(PA.hosts_value)
-            self.parent.hosts_field.set_values(sorted(PA.sorted_hosts))
-        self.parent.num_hosts_field.set_value('  ' + str(len(PA.hosts_value)))
-        self.parent.display()
-
-    def safe_to_exit(self):
-        if len(self.parent.parentApp.selected_dps) == 0:
-            return False
-        return True
-
+# the form for selecting what hosts will be in the cluster
 class SelectHostsForm(CancelNextForm):
     def __init__(self, *args, **kwargs):
         self.help = """Select the hosts that will be in your cluster.\n\n"""

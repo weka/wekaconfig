@@ -20,6 +20,7 @@ if __name__ == '__main__':
     print(f"collecting host data... please wait...")
     host_list = scan_hosts(args.host)
 
+    # UI starts here - it consists of an App, which has Forms (pages).  Each Form has data entry/display Widgets.
     config = WekaConfigApp(host_list)
     config.run()
     if not config.cleanexit:
