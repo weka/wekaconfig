@@ -6,7 +6,7 @@ import socket
 import sys
 import time
 
-import wekalib.exceptions
+from wekalib.exceptions import NewConnectionError, LoginError, CommunicationError
 from wekalib.wekaapi import WekaApi
 
 
@@ -65,13 +65,18 @@ def resolve_hostname(hostname):
 
 
 def beacon_hosts(host):
-    api = WekaApi(host, scheme="http", verify_cert=False)
+    try:
+        api = WekaApi(host, scheme="http", verify_cert=False)
+    except NewConnectionError:
+        print(f"ERROR: Unable to contact host '{host}'")
+        sys.exit(1)
+
     try:
         host_status = api.weka_api_command("status", parms={})
-    except wekalib.exceptions.LoginError:
+    except LoginError:
         print(f"{host}: Login failure.  Is this host already part of a cluster?")
         sys.exit(1)
-    except wekalib.exceptions.CommunicationError:
+    except CommunicationError:
         print(f"{host}: Unable to communicate with {host}")
         sys.exit(1)
         # long-term, ask for admin password so we can reset/reconfigure the cluster
@@ -105,11 +110,11 @@ def find_valid_hosts(beacons):
         host_api = WekaApi(host, scheme="http", verify_cert=False)
         try:
             machine_info = host_api.weka_api_command("machine_query_info", parms={})
-        except wekalib.exceptions.LoginError:
+        except LoginError:
             print(f"host {host} failed login?")
             errors = True
             continue
-        except wekalib.exceptions.CommunicationError:
+        except CommunicationError:
             print(f"Error communicating with host {host}")
             errors = True
             continue
