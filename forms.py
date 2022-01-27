@@ -7,7 +7,7 @@ import npyscreen
 
 import logic
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
-    NameWidget, DataWidget, ParityWidget, WekaTitleFixedText, Networks, Hosts
+    NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts
 
 from logic import Cores
 
@@ -83,16 +83,23 @@ class SelectCoresForm(PrevDoneForm):
             "Auto Failure Domain",
             "Cloud Enable"
         ]
-        self.misc_field = self.add(npyscreen.TitleMultiSelect,
+        self.misc_field = self.add(MiscWidget,
                                    scroll_exit=True,  # allow them to exit using arrow keys
                                    use_two_lines=True,  # input fields start on 2nd line
                                    rely=2,  # put it high on the screen
                                    relx=39,  # place to the right of Networks (above)
                                    begin_entry_at=2,  # make the list under the title
+                                   max_height = len(self.misc_values) +1,
                                    name='Misc:',
                                    values=self.misc_values,  # field labels
-                                   value=[]  # which are selected
+                                   value=[]  # which are selected - set later
                                    )
+
+        self.memory_field = self.add(MemoryWidget,
+                                     label="RAM per Host",
+                                     rely=2+len(self.misc_values)+2,
+                                     relx = 39,
+                                     entry_field_width=3)
 
                                 # values=["01234567890123456789012345678901234567890123456789", # testing
                                 #        "          1         2         3         4"] ) # testing
@@ -275,6 +282,14 @@ class SelectHostsForm(CancelNextForm):
             return
         for index in self.hosts_field.value:  # an index into the orig list, ie: [0,2,4,6,7]
             PA.selected_hosts[PA.sorted_hosts[index]] = PA.possible_hosts[PA.sorted_hosts[index]]
+
+        # find the amount of RAM we can use...  min of all hosts in the cluster
+        for host in PA.selected_hosts.values():
+            try:
+                if int(host.total_ramGB) < self.min_host_ramGB:
+                    PA.min_host_ramGB = int(host.total_ramGB)
+            except AttributeError:  # haven't set self.min_host_ramGB yet...
+                PA.min_host_ramGB = int(host.total_ramGB)
 
         PA.setNextForm("SelectCoresForm")
 

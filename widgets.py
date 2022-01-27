@@ -254,12 +254,44 @@ class ParityWidget(DataParityBase):
         PA.paritydrives = self.intval
 
 
+class MemoryWidget(CoresWidgetBase):
+    """specific for parity drives input"""
+    def __init__(self, *args, label='', entry_field_width=4, relx=0, rely=0, **keywords):
+        begin_entry_at=len(label) +2    # leave room for ": "
+        self.editable = False   # default to not editable
+        super(MemoryWidget, self).__init__(*args, label=label, begin_entry_at=begin_entry_at,
+                                           entry_field_width=entry_field_width, relx=relx, rely=rely, **keywords)
+
+    def check_value(self):
+        usable_ram = self.parent.parentApp.min_host_ramGB - 20
+        if self.intval < 50:
+            return f'{self.intval}GB, really?  How do you expect to run Weka on {self.intval}GB? Please enter a value between 50GB and {usable_ram}GB'
+        if self.intval > usable_ram:
+            return f'{self.intval}GB of ram is greater than the max usable of {usable_ram}GB'
+        return None
+
+    def set_values(self):
+        PA = self.parent.parentApp
+        PA.memory = self.intval
+
+class MiscWidget(npyscreen.TitleMultiSelect):
+    def when_value_edited(self):
+        parent = self.parent
+        if 0 not in self.value:
+            parent.memory_field.editable = True
+        else:
+            parent.memory_field.editable = False
+            parent.memory_field.value = None
+            parent.memory_field.display()
+
+
+
 # a widget for displaying how many hosts there are (read-only)
 class Hosts(npyscreen.TitleMultiSelect):
     def when_value_edited(self):
         parent = self.parent
         # update the "Number of hosts" field on the lower-left
-        parent.num_hosts_field.set_value(str(len(parent.hosts_field.value)))
+        parent.num_hosts_field.set_value(' ' + str(len(parent.hosts_field.value)))
         parent.num_hosts_field.display()
 
 
@@ -278,7 +310,8 @@ class Networks(npyscreen.TitleMultiSelect):
         if hasattr(self.parent, "hosts_field"):
             self.parent.hosts_field.set_value(PA.hosts_value)
             self.parent.hosts_field.set_values(sorted(PA.sorted_hosts))
-        self.parent.num_hosts_field.set_value('  ' + str(len(PA.hosts_value)))
+            self.parent.hosts_field.when_value_edited()
+        #self.parent.num_hosts_field.set_value('  ' + str(len(PA.hosts_value)))
         self.parent.display()
 
     # is it ok to leave the field when they try to exit?   Make sure they select something

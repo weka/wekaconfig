@@ -28,6 +28,7 @@ class STEMHost(object):
         self.version = info_hw['version']
         self.info_hw = info_hw  # save a copy in case we need it
         self.dataplane_nics = dict()
+        self.total_ramGB = self.info_hw["memory"]["total"]/1024/1024/1024
 
         for drive in info_hw['disks']:
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
@@ -43,6 +44,7 @@ class STEMHost(object):
                                       details['interface_alias'],
                                       f"{net_adapter['ip4']}/{net_adapter['ip4Netmask']}",
                                       details['speedMbps'])
+
 
     def find_interface_details(self, iface):
         for eth in self.info_hw['eths']:

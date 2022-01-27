@@ -37,11 +37,12 @@ class WekaCluster(object):
         #host_id = 0
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
-            thishost = base + str(host.host_id) + ' '
+            #thishost = base + str(host.host_id) + ' '
+            thishost = f"{base} {host.host_id} "
             for nic_list in host.dataplane_nics.values():
                 for nic in nic_list:
-                    thishost += nic.name
-                result.append(thishost)
+                    thishost = f"{base} {host.host_id} {nic.name} --netmask={nic.network.prefixlen}"
+                    result.append(thishost)
             #host_id += 1
         return result
 
@@ -70,16 +71,25 @@ class WekaCluster(object):
             result.append(thishost)
         return result
 
+
+    def _memory_alloc(self):
+        base = 'host memory'
+        result = list()
+        for hostname, host in sorted(self.config.selected_hosts.items()):
+            thishost = f'{base} {host.host_id} {self.config.memory}GB'
+            result.append(thishost)
+        return result
+
+
     def _dedicate(self):
         if not self.config.dedicated:
-            return []
+            return self._memory_alloc()
         base = 'host dedicate '
         #host_id = 0
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
             thishost = base + str(host.host_id) + ' on'
             result.append(thishost)
-            #host_id += 1
         return result
 
     def _parity(self):

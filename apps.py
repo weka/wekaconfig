@@ -42,7 +42,7 @@ class WekaConfigApp(npyscreen.NPSAppManaged):
         self.datadrives = None
         self.paritydrives = None
         self.cleanexit = False
-        self.misc = None
+        self.misc = [0,1,2]
         self.dedicated = None
         self.auto_failure_domain = None
         self.cloud_enable = None
