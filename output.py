@@ -25,13 +25,19 @@ class WekaCluster(object):
         # host-ips
         output += "--host-ips="
         for hostname, host in sorted(self.config.selected_hosts.items()):
+            this_hosts_ifs = set()
             count = 0
-            for nic_list in host.dataplane_nics.values():
-                for nic in nic_list:
-                    if count > 0:
-                        output += '+'
-                    output += nic.ip.exploded
-                    count += 1
+            for interface in self.config.selected_dps:
+                iplist = self.config.target_hosts.pingable_ips[interface] # list of ips accessible via the interface
+                for host_int, nic in host.nics.items():
+                    if nic in iplist:
+                        this_hosts_ifs.add(nic)
+
+            for nic in this_hosts_ifs:
+                if count > 0:
+                    output += '+'
+                output += nic.ip.exploded
+                count += 1
             output += ','
 
         result = output[:-1] if output[-1] == ',' else output
@@ -44,8 +50,6 @@ class WekaCluster(object):
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
             this_hosts_ifs = set()
-            # thishost = base + str(host.host_id) + ' '
-            #thishost = f"{base} {host.host_id} "
             for interface in self.config.selected_dps:
                 iplist = self.config.target_hosts.pingable_ips[interface] # list of ips accessible via the interface
                 for host_int, nic in host.nics.items():
