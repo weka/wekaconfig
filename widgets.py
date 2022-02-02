@@ -300,12 +300,17 @@ class Networks(npyscreen.TitleMultiSelect):
     def when_value_edited(self):
         PA = self.parent.parentApp
         PA.selected_dps = list()  # clear the list
+        PA.possible_hosts = set()
         for index in self.parent.dataplane_networks_field.value:
             # save the IPv4Network objects corresponding to the selected items
-            PA.selected_dps.append(self.parent.nets[index])
-        self.parent.analyze_networks()
-        PA.possible_hosts, PA.excluded_hosts = logic.filter_hosts(PA.selected_dps, PA.target_hosts)
-        PA.sorted_hosts = sorted(PA.possible_hosts.keys())  # list of names, not STEMHost objects
+            PA.possible_hosts |= PA.target_hosts.accessible_hosts[self.parent.nets[index]]
+            PA.selected_dps.append(self.parent.nets[index]) # ie: "ib0"
+        #self.parent.analyze_networks()
+        #PA.possible_hosts, PA.excluded_hosts = logic.filter_hosts(PA.selected_dps, PA.target_hosts)
+        #PA.sorted_hosts = sorted(PA.possible_hosts.keys())  # list of names, not STEMHost objects
+        #for host in list(PA.target_hosts.accessible_hosts[PA.selected_dps]): # list of STEMHosts
+        #    PA.possible_hosts[host.name] = host
+        PA.sorted_hosts = sorted(list(PA.possible_hosts))  # sorted hostnames
         PA.hosts_value = list(range(0, len(PA.sorted_hosts)))
         if hasattr(self.parent, "hosts_field"):
             self.parent.hosts_field.set_value(PA.hosts_value)

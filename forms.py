@@ -3,9 +3,12 @@
 ################################################################################################
 # These forms define what pages the user sees
 
+from logging import getLogger
+
 import npyscreen
 
-import logic
+log = getLogger(__name__)
+
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
     NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts
 
@@ -17,6 +20,7 @@ movement_help = """Cursor movement:
     Tab: move to next field
     """
 
+
 # base classes
 class WekaActionForm(npyscreen.ActionFormV2):
     def pre_edit_loop(self):
@@ -24,6 +28,7 @@ class WekaActionForm(npyscreen.ActionFormV2):
             self.editw = 0
         if not self._widgets__[self.editw].editable:
             self.find_next_editable()
+
 
 class CancelNextForm(WekaActionForm):
     OK_BUTTON_TEXT = "Next"
@@ -64,9 +69,9 @@ class SelectCoresForm(PrevDoneForm):
         self.total_cores_field = self.add(WekaTitleFixedText, label="Cores per host", entry_field_width=3)
         self.total_drives_field = self.add(WekaTitleFixedText, label="Drives per host", entry_field_width=3)
         self.num_hosts_field = self.add(WekaTitleFixedText, label="Number of hosts", entry_field_width=3)
-        self.nextrely += 2 # skip 2 lines
+        self.nextrely += 2  # skip 2 lines
         self.usable_cores_field = self.add(UsableCoresWidget, label="Total Weka Cores", entry_field_width=2)
-        self.nextrely += 1 # skip a line
+        self.nextrely += 1  # skip a line
         self.fe_cores_field = self.add(FeCoresWidget, label="FE Cores", entry_field_width=2)
         self.drives_cores_field = self.add(DrivesCoresWidget, label="DRIVES Cores", entry_field_width=2)
         self.compute_cores_field = self.add(ComputeCoresWidget, label="COMPUTE Cores", entry_field_width=2)
@@ -89,7 +94,7 @@ class SelectCoresForm(PrevDoneForm):
                                    rely=2,  # put it high on the screen
                                    relx=39,  # place to the right of Networks (above)
                                    begin_entry_at=2,  # make the list under the title
-                                   max_height = len(self.misc_values) +1,
+                                   max_height=len(self.misc_values) + 1,
                                    name='Misc:',
                                    values=self.misc_values,  # field labels
                                    value=[]  # which are selected - set later
@@ -97,12 +102,12 @@ class SelectCoresForm(PrevDoneForm):
 
         self.memory_field = self.add(MemoryWidget,
                                      label="RAM per Host",
-                                     rely=2+len(self.misc_values)+2,
-                                     relx = 39,
+                                     rely=2 + len(self.misc_values) + 2,
+                                     relx=39,
                                      entry_field_width=3)
 
-                                # values=["01234567890123456789012345678901234567890123456789", # testing
-                                #        "          1         2         3         4"] ) # testing
+        # values=["01234567890123456789012345678901234567890123456789", # testing
+        #        "          1         2         3         4"] ) # testing
 
     def align_fields(self):
         """align the input fields so they all start at the same X offset & right-justify the label"""
@@ -110,14 +115,14 @@ class SelectCoresForm(PrevDoneForm):
         # find how long the longest label is
         longest_label = 0
         for widget in self._widgets__:
-            if npyscreen.TitleText in widget.__class__.__mro__: # is this the right type of object?
+            if npyscreen.TitleText in widget.__class__.__mro__:  # is this the right type of object?
                 widget.label_len = len(widget.label_widget.value)
                 if widget.label_len > longest_label:
                     longest_label = widget.label_len
 
-        entry_field_starts_at = longest_label +1
+        entry_field_starts_at = longest_label + 1
         for widget in self._widgets__:
-            if npyscreen.TitleText in widget.__class__.__mro__: # is this the right type of object?
+            if npyscreen.TitleText in widget.__class__.__mro__:  # is this the right type of object?
                 # move the label to the right so that they all end at the same spot
                 relx_delta = longest_label - widget.label_len
                 widget.set_relyx(widget.rely, widget.relx + relx_delta)
@@ -126,20 +131,19 @@ class SelectCoresForm(PrevDoneForm):
 
         # fix the field width
         for widget in self._widgets__:
-            if npyscreen.TitleText in widget.__class__.__mro__: # is this the right type of object?
+            if npyscreen.TitleText in widget.__class__.__mro__:  # is this the right type of object?
                 widget.width = widget.text_field_begin_at + widget.entry_field_width
-                widget.entry_widget.width = widget.entry_field_width +1
-                widget.entry_widget.request_width = widget.entry_field_width +1
-
+                widget.entry_widget.width = widget.entry_field_width + 1
+                widget.entry_widget.request_width = widget.entry_field_width + 1
 
     def beforeEditing(self):
         PA = self.parentApp
-        if PA.selected_cores is None:   # if we haven't visited this form before
+        if PA.selected_cores is None:  # if we haven't visited this form before
             self.num_cores = self.analyse_cores()
             self.num_drives = self.analyse_drives()
             PA.selected_cores = Cores(self.num_cores, self.num_drives)
 
-        PA.selected_cores.recalculate() # make sure they make sense
+        PA.selected_cores.recalculate()  # make sure they make sense
         # repopulate the data to make sure it's correct on the screen
         self.total_cores_field.set_value(str(self.num_cores))
         self.total_drives_field.set_value(str(self.num_drives))
@@ -192,7 +196,7 @@ class SelectCoresForm(PrevDoneForm):
         # let's gather together the info
         host_cores = dict()
         for hostname in self.parentApp.selected_hosts:
-            host_cores[hostname] = self.parentApp.target_hosts[hostname].num_cores
+            host_cores[hostname] = self.parentApp.target_hosts.usable_hosts[hostname].num_cores
 
         # are they all the same?
         reference_cores = 0
@@ -218,7 +222,7 @@ class SelectCoresForm(PrevDoneForm):
         # let's gather together the info
         num_drives = dict()
         for hostname in self.parentApp.selected_hosts:
-            num_drives[hostname] = len(self.parentApp.target_hosts[hostname].drives)
+            num_drives[hostname] = len(self.parentApp.target_hosts.usable_hosts[hostname].drives)
 
         reference_drives = 0
         errors = False
@@ -251,27 +255,30 @@ class SelectHostsForm(CancelNextForm):
         # what happens when there's only 1 possible dp network?
         self.dataplane_networks_field = self.add(Networks, fieldname="networks",
                                                  scroll_exit=True,  # allow them to exit using arrow keys
-                                                 max_height=15,  # not too big - need room below for next field
+                                                 max_height=5,  # not too big - need room below for next field
                                                  use_two_lines=True,  # input fields start on 2nd line
                                                  rely=2,  # put it high on the screen
-                                                 max_width=38,  # leave room to the right for hosts entry
+                                                 #max_width=38,  # leave room to the right for hosts entry
+                                                 max_width=80,  # leave room to the right for hosts entry
                                                  begin_entry_at=2,  # make the list under the title
                                                  name='Select DP Networks:',  # label/title
-                                                 #values=["255.255.255.255/32 - 200 Gbps"]) # testing
+                                                 # values=["255.255.255.255/32 - 200 Gbps"]) # testing
                                                  values=self.possible_dps)
 
         self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts", name="Number of Hosts:",
-                                    labelColor='NO_EDIT',
-                                    use_two_lines=False, editable=False, max_width=22)
+                                        labelColor='NO_EDIT',
+                                        rely=8, relx=2,
+                                        use_two_lines=False, editable=False, max_width=22)
         self.hosts_field = self.add(Hosts, fieldname="hosts",
                                     scroll_exit=True,  # allow them to exit using arrow keys
                                     use_two_lines=True,  # input fields start on 2nd line
-                                    rely=2,  # put it high on the screen
-                                    relx=39, # place to the right of Networks (above)
+                                    #rely=2,  # put it high on the screen
+                                    #relx=39,  # place to the right of Networks (above)
+                                    relx=2, rely=10,
                                     begin_entry_at=2,  # make the list under the title
                                     name='Select Hosts:')
-                                    #values=["01234567890123456789012345678901234567890123456789", # testing
-                                    #        "          1         2         3         4"] ) # testing
+        # values=["01234567890123456789012345678901234567890123456789", # testing
+        #        "          1         2         3         4"] ) # testing
 
     def on_ok(self):
         PA = self.parentApp
@@ -281,7 +288,7 @@ class SelectHostsForm(CancelNextForm):
             npyscreen.notify_wait("You must select at least 5 hosts", title='ERROR')
             return
         for index in self.hosts_field.value:  # an index into the orig list, ie: [0,2,4,6,7]
-            PA.selected_hosts[PA.sorted_hosts[index]] = PA.possible_hosts[PA.sorted_hosts[index]]
+            PA.selected_hosts[PA.sorted_hosts[index]] = PA.target_hosts.usable_hosts[PA.sorted_hosts[index]]
 
         # find the amount of RAM we can use...  min of all hosts in the cluster
         for host in PA.selected_hosts.values():
@@ -321,14 +328,17 @@ class SelectHostsForm(CancelNextForm):
         # make a unique list of networks
         self.nets = list()
         output = list()
-        for host in hostlist.values():
-            for iface in host.nics.values():
-                # network = ipaddress.IPv4Network(f"{iface['ip4']}/{iface['mask']}", strict=False)
-                network = iface.network
-                if network not in self.nets:
-                    self.nets.append(network)
-                    output.append(f"{iface.type}: {network} - {int(iface.speed / 1000)} Gbps")
+        for iface, nic in sorted(hostlist.referencehost_obj.nics.items()):
+            output.append(f"{iface}: {nic.with_prefixlen} - {nic.type}, {int(nic.speed / 1000)} Gbps, " +
+                          f"{len(hostlist.accessible_hosts[iface])} hosts")
+            self.nets.append(iface)
+
+        #for host in hostlist.usable_hosts.values():
+        #    for iface in host.nics.values():
+        #        # network = ipaddress.IPv4Network(f"{iface['ip4']}/{iface['mask']}", strict=False)
+        #        network = iface.network
+        #        if network not in self.nets:
+        #            self.nets.append(network)
+        #            output.append(f"{iface.type}: {network} - {int(iface.speed / 1000)} Gbps")
 
         return output
-
-

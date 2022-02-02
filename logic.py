@@ -1,6 +1,10 @@
 ################################################################################################
 # Logic
 ################################################################################################
+from logging import getLogger
+
+log = getLogger(__name__)
+
 
 class Cores():
     def __init__(self, total_cores, num_drives):
@@ -25,6 +29,7 @@ class Cores():
             self.drives = 1
             if self.usable < 3:
                 self.usable = 3
+
 
 def filter_hosts(network_list, host_dict):
     """Takes a list of selected IPv4Network objects and a dict of hostname:STEMHost objects
