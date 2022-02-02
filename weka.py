@@ -15,7 +15,7 @@ except ImportError:
 
 import getpass
 
-from wekalib.exceptions import LoginError, CommunicationError
+from wekalib.exceptions import LoginError, CommunicationError, NewConnectionError
 from wekalib.wekaapi import WekaApi
 
 class WekaInterface(ipaddress.IPv4Interface):
