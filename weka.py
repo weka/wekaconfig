@@ -307,10 +307,10 @@ class WekaHostGroup():
         del candidates
 
         print("Exploring network...")
-        self.ssh_client = open_ssh_connection(reference_hostname)
+        self.ssh_client = open_ssh_connection(self.reference_hostname)
 
         if self.ssh_client is None:
-            print(f"unable to ssh to {reference_hostname}")
+            print(f"unable to ssh to {self.reference_hostname}")
             self.usable_hosts = candidates2
             return
 
