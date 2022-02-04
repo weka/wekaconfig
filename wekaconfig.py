@@ -22,6 +22,9 @@ if __name__ == '__main__':
 
     configure_logging(log, args.verbosity)
 
+    if args.host == "localhost":
+        import platform
+        args.host = platform.node()
     print(f"target host is {args.host}")
     print(f"collecting host data... please wait...")
     host_list = scan_hosts(args.host)
