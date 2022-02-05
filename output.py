@@ -1,6 +1,12 @@
 ################################################################################################
 # Output Utility routines
 ################################################################################################
+
+from logging import getLogger
+
+log = getLogger(__name__)
+
+
 class WekaCluster(object):
     def __init__(self, config):
         self.config = config
@@ -19,13 +25,19 @@ class WekaCluster(object):
         # host-ips
         output += "--host-ips="
         for hostname, host in sorted(self.config.selected_hosts.items()):
+            this_hosts_ifs = set()
             count = 0
-            for nic_list in host.dataplane_nics.values():
-                for nic in nic_list:
-                    if count > 0:
-                        output += '+'
-                    output += nic.ip.exploded
-                    count += 1
+            for interface in self.config.selected_dps:
+                iplist = self.config.target_hosts.pingable_ips[interface] # list of ips accessible via the interface
+                for host_int, nic in host.nics.items():
+                    if nic in iplist:
+                        this_hosts_ifs.add(nic)
+
+            for nic in this_hosts_ifs:
+                if count > 0:
+                    output += '+'
+                output += nic.ip.exploded
+                count += 1
             output += ','
 
         result = output[:-1] if output[-1] == ',' else output
@@ -34,21 +46,29 @@ class WekaCluster(object):
     # returns a list of strings
     def _net_add(self):
         base = 'host net add '
-        #host_id = 0
+        # host_id = 0
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
-            #thishost = base + str(host.host_id) + ' '
-            thishost = f"{base} {host.host_id} "
-            for nic_list in host.dataplane_nics.values():
-                for nic in nic_list:
-                    thishost = f"{base} {host.host_id} {nic.name} --netmask={nic.network.prefixlen}"
-                    result.append(thishost)
-            #host_id += 1
+            this_hosts_ifs = set()
+            for interface in self.config.selected_dps:
+                iplist = self.config.target_hosts.pingable_ips[interface] # list of ips accessible via the interface
+                for host_int, nic in host.nics.items():
+                    if nic in iplist:
+                        this_hosts_ifs.add(nic)
+
+            for nic in list(this_hosts_ifs):
+                if nic.gateway is not None:
+                    gateway = f"--gateway={nic.gateway}"
+                else:
+                    gateway = ''
+                thishost = f"{base} {host.host_id} {nic.name} --netmask={nic.network.prefixlen} {gateway}"
+                result.append(thishost)
+
         return result
 
     def _drive_add(self):
         base = 'drive add '
-        #host_id = 0
+        # host_id = 0
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
             thishost = base + str(host.host_id) + ' '
@@ -56,21 +76,20 @@ class WekaCluster(object):
                 thishost += drive + ' '
             thishost += '--force'
             result.append(thishost)
-            #host_id += 1
+            # host_id += 1
         return result
 
     def _host_cores(self):
         base = 'host cores '
-        #host_id = 0
+        # host_id = 0
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
             cores = self.config.selected_cores
             thishost = base + str(host.host_id) + ' ' + str(cores.usable) + ' --frontend-dedicated-cores ' + \
                        str(cores.fe) + ' --drives-dedicated-cores ' + str(cores.drives)
-            #host_id += 1
+            # host_id += 1
             result.append(thishost)
         return result
-
 
     def _memory_alloc(self):
         base = 'host memory'
@@ -80,12 +99,11 @@ class WekaCluster(object):
             result.append(thishost)
         return result
 
-
     def _dedicate(self):
         if not self.config.dedicated:
             return self._memory_alloc()
         base = 'host dedicate '
-        #host_id = 0
+        # host_id = 0
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
             thishost = base + str(host.host_id) + ' on'
@@ -101,12 +119,12 @@ class WekaCluster(object):
     def _failure_domain(self):
         if self.config.auto_failure_domain:
             base = 'host failure-domain '
-            #host_id = 0
+            # host_id = 0
             result = list()
             for hostname, host in sorted(self.config.selected_hosts.items()):
                 thishost = base + str(host.host_id) + ' --auto'
                 result.append(thishost)
-                #host_id += 1
+                # host_id += 1
             return result
         else:
             return []
@@ -158,8 +176,8 @@ class WekaCluster(object):
             if name is not None:
                 fp.write(WEKA_CLUSTER + name + NL)
             fp.write(WEKA_CLUSTER + self._apply() + NL)
-            fp.write("sleep 60\n")
-            fp.write(WEKA_CLUSTER + self._start_io() + NL)
+            #fp.write("sleep 60\n")
+            #fp.write(WEKA_CLUSTER + self._start_io() + NL) # won't start without license in 3.14+
 
     def dump(self, file):
         pass
