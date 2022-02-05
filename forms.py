@@ -5,7 +5,7 @@
 
 from logging import getLogger
 
-import npyscreen
+import wekatui
 
 log = getLogger(__name__)
 
@@ -22,7 +22,7 @@ movement_help = """Cursor movement:
 
 
 # base classes
-class WekaActionForm(npyscreen.ActionFormV2):
+class WekaActionForm(wekatui.ActionFormV2):
     def pre_edit_loop(self):
         if not self.preserve_selected_widget:
             self.editw = 0
@@ -62,7 +62,7 @@ class SelectCoresForm(PrevDoneForm):
         super(SelectCoresForm, self).__init__(*args, help=help, **kwargs)
 
     def create(self):
-        self.title1 = self.add(npyscreen.FixedText,
+        self.title1 = self.add(wekatui.FixedText,
                                value="Host Configuration Reference",
                                color='NO_EDIT',
                                editable=False)
@@ -115,14 +115,14 @@ class SelectCoresForm(PrevDoneForm):
         # find how long the longest label is
         longest_label = 0
         for widget in self._widgets__:
-            if npyscreen.TitleText in widget.__class__.__mro__:  # is this the right type of object?
+            if wekatui.TitleText in widget.__class__.__mro__:  # is this the right type of object?
                 widget.label_len = len(widget.label_widget.value)
                 if widget.label_len > longest_label:
                     longest_label = widget.label_len
 
         entry_field_starts_at = longest_label + 1
         for widget in self._widgets__:
-            if npyscreen.TitleText in widget.__class__.__mro__:  # is this the right type of object?
+            if wekatui.TitleText in widget.__class__.__mro__:  # is this the right type of object?
                 # move the label to the right so that they all end at the same spot
                 relx_delta = longest_label - widget.label_len
                 widget.set_relyx(widget.rely, widget.relx + relx_delta)
@@ -131,7 +131,7 @@ class SelectCoresForm(PrevDoneForm):
 
         # fix the field width
         for widget in self._widgets__:
-            if npyscreen.TitleText in widget.__class__.__mro__:  # is this the right type of object?
+            if wekatui.TitleText in widget.__class__.__mro__:  # is this the right type of object?
                 widget.width = widget.text_field_begin_at + widget.entry_field_width
                 widget.entry_widget.width = widget.entry_field_width + 1
                 widget.entry_widget.request_width = widget.entry_field_width + 1
@@ -213,7 +213,7 @@ class SelectCoresForm(PrevDoneForm):
 
         if errors:
             # make noise
-            npyscreen.notify_confirm("The hosts are not homogenous; they have different numbers of cores.",
+            wekatui.notify_confirm("The hosts are not homogenous; they have different numbers of cores.",
                                      title="Error", form_color='STANDOUT', wrap=True, editw=1)
 
         return reference_cores
@@ -236,7 +236,7 @@ class SelectCoresForm(PrevDoneForm):
                     break
         if errors:
             # make noise
-            npyscreen.notify_confirm("The hosts are not homogenous; they have different numbers of drives.",
+            wekatui.notify_confirm("The hosts are not homogenous; they have different numbers of drives.",
                                      title="Error", form_color='STANDOUT', wrap=True, editw=1)
 
         return reference_drives
@@ -265,7 +265,7 @@ class SelectHostsForm(CancelNextForm):
                                                  # values=["255.255.255.255/32 - 200 Gbps"]) # testing
                                                  values=self.possible_dps)
 
-        self.num_hosts_field = self.add(npyscreen.TitleFixedText, fieldname="num_hosts", name="Number of Hosts:",
+        self.num_hosts_field = self.add(wekatui.TitleFixedText, fieldname="num_hosts", name="Number of Hosts:",
                                         labelColor='NO_EDIT',
                                         rely=8, relx=2,
                                         use_two_lines=False, editable=False, max_width=22)
@@ -285,7 +285,7 @@ class SelectHostsForm(CancelNextForm):
         PA.selected_hosts = dict()  # toss any old values
         if len(self.hosts_field.value) < 5:
             # they didn't select any
-            npyscreen.notify_wait("You must select at least 5 hosts", title='ERROR')
+            wekatui.notify_wait("You must select at least 5 hosts", title='ERROR')
             return
         for index in self.hosts_field.value:  # an index into the orig list, ie: [0,2,4,6,7]
             PA.selected_hosts[PA.sorted_hosts[index]] = PA.target_hosts.usable_hosts[PA.sorted_hosts[index]]
