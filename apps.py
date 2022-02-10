@@ -5,11 +5,11 @@ from logging import getLogger
 
 log = getLogger(__name__)
 
-import npyscreen
+import wekatui
 from forms import SelectHostsForm, SelectCoresForm
 
 
-class WekaTheme(npyscreen.ThemeManager):
+class WekaTheme(wekatui.ThemeManager):
     default_colors = {
         'DEFAULT': 'WHITE_BLACK',
         'FORMDEFAULT': 'WHITE_BLACK',
@@ -34,7 +34,7 @@ class WekaTheme(npyscreen.ThemeManager):
 #
 # the base app - this is the entrypoint to the UI
 #
-class WekaConfigApp(npyscreen.NPSAppManaged):
+class WekaConfigApp(wekatui.NPSAppManaged):
     STARTING_FORM = "SelectHostsForm"  # the first form to display
 
     def __init__(self, hostlist):
@@ -56,7 +56,7 @@ class WekaConfigApp(npyscreen.NPSAppManaged):
         super(WekaConfigApp, self).__init__()
 
     def onStart(self):
-        npyscreen.setTheme(WekaTheme)
+        wekatui.setTheme(WekaTheme)
         self.addForm("SelectHostsForm", SelectHostsForm, "Weka Configurator (Hosts)")
         # self.addForm("Hosts", SelectHosts, "Weka Configurator (Hosts)")
         self.addForm("SelectCoresForm", SelectCoresForm, "Weka Configurator (Cores)")
