@@ -18,6 +18,7 @@ import getpass
 from wekalib.exceptions import LoginError, CommunicationError, NewConnectionError
 from wekalib.wekaapi import WekaApi
 
+
 class WekaInterface(ipaddress.IPv4Interface):
     def __init__(self, linklayer, name, address, speed):
         self.type = linklayer
@@ -46,26 +47,36 @@ class STEMHost(object):
 
         for net_adapter in info_hw['net']['interfaces']:
             if (4000 < net_adapter['mtu'] < 10000) and len(net_adapter['ip4']) > 0:
-                details = self.find_interface_details(net_adapter['name'])
-                if details['ethBondingMaster'] != '':  # what are the other values?
-                    print(f"{name}:{net_adapter['name']}:ethBondingMaster = {details['ethBondingMaster']}")
-                    pass
-                if net_adapter['bondType'] != 'NONE':  # what are the other values?
-                    print(f"{name}:{net_adapter['name']}:bondType = {net_adapter['bondType']}")
-                    pass
+                # if details['ethBondingMaster'] != '':  # what are the other values?
+                #    print(f"{name}:{net_adapter['name']}:ethBondingMaster = {details['ethBondingMaster']}")
+                #    pass
+                if net_adapter['bondType'] == 'NONE':  # "NONE", "BOND" and "SLAVE" are valid
+                    details = self.find_interface_details(net_adapter['name'])
+                elif net_adapter['bondType'] == 'BOND':
+                    details = self.find_bond_details(net_adapter['name'])
+                else:
+                    continue  # skip slaves
+
                 if len(net_adapter['name_slaves']) != 0:  # what are other values?
                     print(f"{name}:{net_adapter['name']}:name_slaves = {net_adapter['name_slaves']}")
                     pass
                 if details['validationCode'] == "OK" and details['linkDetected']:
                     self.nics[net_adapter['name']] = \
                         WekaInterface(net_adapter['linkLayer'],
-                                      details['interface_alias'],
+                                      # details['interface_alias'],
+                                      net_adapter['name'],
                                       f"{net_adapter['ip4']}/{net_adapter['ip4Netmask']}",
                                       details['speedMbps'])
 
     def find_interface_details(self, iface):
         for eth in self.info_hw['eths']:
             if eth['interface_alias'] == iface:
+                return eth
+        return None
+
+    def find_bond_details(self, iface):
+        for eth in self.info_hw['eths']:
+            if eth['ethBondingMaster'] == iface:
                 return eth
         return None
 
@@ -243,11 +254,10 @@ def get_gateways(hostlist, ref_hostname, user, password):
                 nic_obj.nics.gateway = outputlines[0][2]
 
 
-
 class WekaHostGroup():
     def __init__(self, reference_hostname, beacons):
 
-    #def find_valid_hosts(reference_hostname, beacons):
+        # def find_valid_hosts(reference_hostname, beacons):
         """
         Using reference_hostname as a basis, find the other hosts that we can make into a cluster
         The idea is to narrow down the beacons list to something that will work
@@ -321,7 +331,7 @@ class WekaHostGroup():
         numnets = dict()
         for source_interface in self.referencehost_obj.nics.keys():
             self.accessible_hosts[source_interface] = set()  # hosts by interface on the reference host
-            self.accessible_hosts[source_interface].add(self.reference_hostname)    # always add this
+            self.accessible_hosts[source_interface].add(self.reference_hostname)  # always add this
             self.pingable_ips[source_interface] = list()
             numnets[source_interface] = set()
             for hostname, hostobj in candidates2.items():
@@ -386,7 +396,6 @@ class WekaHostGroup():
             get_gateways(self.usable_hosts, self.ssh_client.host, self.ssh_client.user, self.ssh_client.password)
 
 
-
 def scan_hosts(reference_hostname):
     """
     scan for STEM-mode Weka hosts
@@ -394,6 +403,6 @@ def scan_hosts(reference_hostname):
     :return: a dict containing the valid STEMHost objects
     """
     stem_beacons = beacon_hosts(reference_hostname)
-    #valid_hosts = find_valid_hosts(reference_hostname, stem_beacons)
+    # valid_hosts = find_valid_hosts(reference_hostname, stem_beacons)
     hostgroup = WekaHostGroup(reference_hostname, stem_beacons)
     return hostgroup
