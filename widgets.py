@@ -4,7 +4,7 @@
 
 import curses.ascii
 
-import npyscreen
+import wekatui
 
 import logic
 
@@ -18,7 +18,7 @@ movement_help = """Cursor movement:
 # base classes
 
 # a data entry field - "label: entryfield" format.   Takes text with a fixed width
-class WekaTitleText(npyscreen.TitleText):
+class WekaTitleText(wekatui.TitleText):
     """Label:text input field"""
 
     def __init__(self, *args, label='', entry_field_width=6, **keywords):
@@ -47,7 +47,7 @@ class WekaTitleText(npyscreen.TitleText):
 
 
 # a data entry field - "label: entryfield" format.   Takes only numeric with a fixed width
-class WekaTitleNumeric(npyscreen.TitleText):
+class WekaTitleNumeric(wekatui.TitleText):
     """Label:numeric input field"""
 
     def __init__(self, *args, label='', entry_field_width=6, **keywords):
@@ -79,7 +79,7 @@ class WekaTitleNumeric(npyscreen.TitleText):
             return False
 
 
-class WekaTitleFixedText(npyscreen.TitleFixedText):
+class WekaTitleFixedText(wekatui.TitleFixedText):
     """Label: value (non-input/no editing) field"""
 
     def __init__(self, *args, label='', entry_field_width=6, **keywords):
@@ -107,7 +107,7 @@ class NameWidget(WekaTitleText):
         import curses
 
         if curses.ascii.isspace(inp):
-            npyscreen.notify_wait("Only a-z,A-Z,0-9,-, and _ are allowed in names")
+            wekatui.notify_wait("Only a-z,A-Z,0-9,-, and _ are allowed in names")
             curses.beep()
             return False
         elif curses.ascii.isalnum(inp):
@@ -116,7 +116,7 @@ class NameWidget(WekaTitleText):
             return True
         else:
             curses.beep()
-            npyscreen.notify_wait("Only a-z,A-Z,0-9,.,-, and _ are allowed in names")
+            wekatui.notify_wait("Only a-z,A-Z,0-9,.,-, and _ are allowed in names")
             return False
 
 
@@ -130,14 +130,14 @@ class CoresWidgetBase(WekaTitleNumeric):
 
     def safe_to_exit(self):
         if len(self.value) == 0:
-            npyscreen.notify_wait("Please enter a number")
+            wekatui.notify_wait("Please enter a number")
             return False
 
         self.intval = int(self.value)
 
         message = self.check_value()
         if message is not None:
-            npyscreen.notify_wait(message)
+            wekatui.notify_wait(message)
             return False
 
         self.set_values()
@@ -190,7 +190,7 @@ class DrivesCoresWidget(CoresWidgetBase):
         elif self.intval == 0:
             return "It is recommended to use at least 1 FE core"
         elif self.intval != PA.selected_cores.drives:
-            npyscreen.notify_wait("It is recommended to use 1 core per drive")
+            wekatui.notify_wait("It is recommended to use 1 core per drive")
         self.parent.parentApp.selected_cores.drives = self.intval
         return None
 
@@ -204,7 +204,7 @@ class ComputeCoresWidget(CoresWidgetBase):
         if self.intval > PA.selected_cores.usable:
             return "Cannot exceed Usable Cores"
         elif self.intval == 0:
-            npyscreen.notify_wait("It is recommended to use at least 1 Compute core")
+            wekatui.notify_wait("It is recommended to use at least 1 Compute core")
         self.parent.parentApp.selected_cores.compute = self.intval
         return None
 
@@ -274,7 +274,7 @@ class MemoryWidget(CoresWidgetBase):
         PA = self.parent.parentApp
         PA.memory = self.intval
 
-class MiscWidget(npyscreen.TitleMultiSelect):
+class MiscWidget(wekatui.TitleMultiSelect):
     def when_value_edited(self):
         parent = self.parent
         if 0 not in self.value:
@@ -287,7 +287,7 @@ class MiscWidget(npyscreen.TitleMultiSelect):
 
 
 # a widget for displaying how many hosts there are (read-only)
-class Hosts(npyscreen.TitleMultiSelect):
+class Hosts(wekatui.TitleMultiSelect):
     def when_value_edited(self):
         parent = self.parent
         # update the "Number of hosts" field on the lower-left
@@ -296,7 +296,7 @@ class Hosts(npyscreen.TitleMultiSelect):
 
 
 # a widget for selecting what the dataplane networks are
-class Networks(npyscreen.TitleMultiSelect):
+class Networks(wekatui.TitleMultiSelect):
     def when_value_edited(self):
         PA = self.parent.parentApp
         PA.selected_dps = list()  # clear the list
