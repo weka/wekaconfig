@@ -234,10 +234,10 @@ class SelectCoresForm(PrevDoneForm):
                 if drives != reference_drives:
                     errors = True
                     break
-        if errors:
+        #if errors:
             # make noise
-            npyscreen.notify_confirm("The hosts are not homogenous; they have different numbers of drives.",
-                                     title="Error", form_color='STANDOUT', wrap=True, editw=1)
+        #    npyscreen.notify_confirm("The hosts are not homogenous; they have different numbers of drives.",
+        #                             title="Error", form_color='STANDOUT', wrap=True, editw=1)
 
         return reference_drives
 
