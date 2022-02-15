@@ -245,8 +245,10 @@ dataplane_hostsfile = dict()
 def get_gateways(hostlist, ref_hostname, user, password):
     clients = dict()
     host_out = dict()
+    print("Searching for gateways...")
     for host, host_obj in hostlist.items():
         # open sessions to all the hosts
+        print(f"Opening ssh to {host}")
         try:
             clients[host] = SSHClient(host,
                                       user=user,
@@ -258,6 +260,7 @@ def get_gateways(hostlist, ref_hostname, user, password):
 
         host_out[host] = dict()
         for nic, nic_obj in host_obj.nics.items():
+            print(f"    Scanning {host}:{nic}")
             # note - this is asynchronous...
             nic_obj.gateway = None
             host_out[host][nic_obj] = clients[host].run_command(f"ip route get 8.8.8.8 oif {nic}")
@@ -268,6 +271,7 @@ def get_gateways(hostlist, ref_hostname, user, password):
             outputlines = list(cmd_output.stdout)
             if outputlines[0][1] == 'via':  # There's a gateway!
                 nic_obj.nics.gateway = outputlines[0][2]
+                print(f"    Host {host}:{nic} has gateway {nic_obj.nics.gateway}")
 
 
 class WekaHostGroup():
@@ -308,7 +312,7 @@ class WekaHostGroup():
                 errors = True
                 continue  # skip it if unable to get the info
 
-            print(f"Host {host} is a STEM-mode instance running release {machine_info['version']}")
+            print(f"    Host {host} is a STEM-mode instance running release {machine_info['version']}")
             candidates[host] = STEMHost(host, machine_info)
 
         if errors:
@@ -352,8 +356,8 @@ class WekaHostGroup():
             numnets[source_interface] = set()
             for hostname, hostobj in candidates2.items():
                 for targetif, targetip in hostobj.nics.items():
-                    if hostname == reference_hostname:
-                        self.pingable_ips[source_interface].append(targetip)
+                    if hostname == reference_hostname and source_interface == targetif:
+                        self.pingable_ips[source_interface].append(targetip) # should only add the ip on the source interface?
                         continue  # not sure why, but ping fails on loopback anyway
                     ssh_out = self.ssh_client.run_command(f"ping -c1 -W1 -I {source_interface} {targetip.ip}")
                     junk = list(ssh_out.stdout)  # gather output so we can get return code
@@ -406,10 +410,10 @@ class WekaHostGroup():
             self.mixed_networking = False
 
         # mixed networking looks routed.
-        if self.isrouted and not self.mixed_networking:
+        #if self.isrouted and not self.mixed_networking:
             # find gateways with "ip route get 8.8.8.8 oif enp2s0"
-            print("Exploring Gateways")  # figure out what the gateways are...
-            get_gateways(self.usable_hosts, self.ssh_client.host, self.ssh_client.user, self.ssh_client.password)
+        #print("Exploring Gateways")  # figure out what the gateways are...
+        get_gateways(self.usable_hosts, self.ssh_client.host, self.ssh_client.user, self.ssh_client.password)
 
 
 def scan_hosts(reference_hostname):
