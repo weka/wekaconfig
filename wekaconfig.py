@@ -29,6 +29,10 @@ if __name__ == '__main__':
     print(f"collecting host data... please wait...")
     host_list = scan_hosts(args.host)
 
+    # pause here so the user can review what's happened before we go to full-screen mode
+    print(f"Scanning Complete.  Press Enter to continue: ", end='')
+    user = input()
+
     # UI starts here - it consists of an App, which has Forms (pages).  Each Form has data entry/display Widgets.
     config = WekaConfigApp(host_list)
     config.run()

@@ -4,6 +4,7 @@
 import ipaddress
 import socket
 import sys
+from collections import OrderedDict
 from logging import getLogger
 
 log = getLogger(__name__)
@@ -137,7 +138,7 @@ def beacon_hosts(hostname):
     for host, ips in stem_beacons.items():
         print(f"{host}: {ips}")
 
-    return stem_beacons
+    return OrderedDict(sorted(stem_beacons.items()))
 
 
 def open_api(host, ip_list=None):
@@ -156,7 +157,7 @@ def open_api(host, ip_list=None):
     for ip in ip_list:
         try:
             log.debug(f"{host}: trying on {ip}")
-            host_api = WekaApi(ip, scheme="http", verify_cert=False)
+            host_api = WekaApi(ip, scheme="http", verify_cert=False, timeout=5)
             break
         except LoginError:
             log.debug(f"host {host} failed login on ip {ip}?")
