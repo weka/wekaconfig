@@ -34,6 +34,7 @@ class STEMHost(object):
         self.num_cores = len(info_hw['cores'])
         self.cpu_model = info_hw['cores'][0]['model']
         self.drives = dict()
+        self.drive_devs = dict()
         self.nics = dict()
         self.version = info_hw['version']
         self.info_hw = info_hw  # save a copy in case we need it
@@ -42,8 +43,20 @@ class STEMHost(object):
 
         for drive in info_hw['disks']:
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
-                    len(drive['pciAddr']) > 0:
-                self.drives[drive['devPath']] = drive['pciAddr']
+                    len(drive['pciAddr']) > 0 and drive['type'] == 'DISK':
+                #self.drives[drive['devPath']] = drive['pciAddr']
+                self.drives[drive['devName']] = drive['devPath']
+
+        # need to determine if any of the above drives are actually in use - boot devices, root drives, etc.
+        # how?
+        #                 "parentName": "sda",
+        #                 "type": "PARTITION",
+        #                 "isMounted": true,
+
+        # remove any drives with mounted partitions from the list
+        for drive in info_hw['disks']:
+            if drive['type'] == "PARTITION" and drive['isMounted'] and drive['parentName'] in self.drives:
+                del self.drives[drive['parentName']]
 
         for net_adapter in info_hw['net']['interfaces']:
             if (4000 < net_adapter['mtu'] < 10000) and len(net_adapter['ip4']) > 0:
@@ -153,6 +166,9 @@ def open_api(host, ip_list=None):
             continue
         except NewConnectionError as exc:
             log.error(f"Unable to contact host {host} - is weka installed there?")
+            continue
+        except Exception as exc:
+            log.error(f"Other exception on host {host}: {exc}")
             continue
 
     if host_api is None:
