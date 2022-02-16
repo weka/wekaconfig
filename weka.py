@@ -45,7 +45,7 @@ class STEMHost(object):
         for drive in info_hw['disks']:
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
                     len(drive['pciAddr']) > 0 and drive['type'] == 'DISK':
-                #self.drives[drive['devPath']] = drive['pciAddr']
+                    # not drive['isSwap'] and \     # pukes now; no longer there in 3.13
                 self.drives[drive['devName']] = drive['devPath']
 
         # need to determine if any of the above drives are actually in use - boot devices, root drives, etc.
@@ -56,8 +56,9 @@ class STEMHost(object):
 
         # remove any drives with mounted partitions from the list
         for drive in info_hw['disks']:
-            if drive['type'] == "PARTITION" and drive['isMounted'] and drive['parentName'] in self.drives:
-                del self.drives[drive['parentName']]
+            if drive['type'] == "PARTITION" and drive['parentName'] in self.drives and drive['isMounted']:
+                #if drive['isSwap'] or drive['isMounted']:
+                    del self.drives[drive['parentName']]
 
         for net_adapter in info_hw['net']['interfaces']:
             if (4000 < net_adapter['mtu'] < 10000) and len(net_adapter['ip4']) > 0:
@@ -270,9 +271,10 @@ def get_gateways(hostlist, ref_hostname, user, password):
     for host, host_obj in hostlist.items():
         for nic_obj, cmd_output in host_out[host].items():
             outputlines = list(cmd_output.stdout)
-            if outputlines[0][1] == 'via':  # There's a gateway!
-                nic_obj.nics.gateway = outputlines[0][2]
-                print(f"    Host {host}:{nic} has gateway {nic_obj.nics.gateway}")
+            splitlines = outputlines[0].split()
+            if splitlines[1] == 'via':  # There's a gateway!
+                nic_obj.gateway = splitlines[2]
+                print(f"    Host {host}:{nic} has gateway {nic_obj.gateway}")
 
 
 class WekaHostGroup():
