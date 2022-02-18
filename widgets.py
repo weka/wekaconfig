@@ -306,6 +306,7 @@ class Hosts(wekatui.TitleMultiSelect):
                     pass
         else:
             PA.HA = False
+        return True
 
         # need tui field to show/select if ha or not...
 
