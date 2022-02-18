@@ -302,7 +302,7 @@ class Hosts(wekatui.TitleMultiSelect):
             for dpname in PA.selected_dps:
                 # if mixed networking, there should be both IB and ETH interfaces on the referencehost
                 # if possibly HA, the interfaces should be... what? on same net?  nah. ask user?
-                if dpname in self.target_hosts.referencehost_obj.info_hw.nis:
+                if dpname in PA.target_hosts.referencehost_obj.info_hw.nis:
                     pass
         else:
             PA.HA = False

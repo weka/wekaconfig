@@ -376,7 +376,7 @@ class WekaHostGroup():
                         if targetip.network not in numnets[source_interface]:
                             numnets[source_interface].add(targetip.network)  # note unique networks
                     else:
-                        log.warning(f"{hostname}: from {source_interface} target: {targetip} failed.")
+                        log.debug(f"From {source_interface} target {hostname}-{targetip} failed.")
 
         # merge the accessible_hosts sets - we need the superset for later
         usable_set = set()  # should we really be using sets here?  A dict might work easier
