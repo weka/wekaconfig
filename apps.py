@@ -1,6 +1,7 @@
 ################################################################################################
 # Apps
 ################################################################################################
+import sys
 from logging import getLogger
 
 log = getLogger(__name__)
@@ -57,9 +58,15 @@ class WekaConfigApp(wekatui.NPSAppManaged):
 
     def onStart(self):
         wekatui.setTheme(WekaTheme)
-        self.addForm("SelectHostsForm", SelectHostsForm, "Weka Configurator (Hosts)")
-        # self.addForm("Hosts", SelectHosts, "Weka Configurator (Hosts)")
-        self.addForm("SelectCoresForm", SelectCoresForm, "Weka Configurator (Cores)")
+        try:
+            self.addForm("SelectHostsForm", SelectHostsForm, "Weka Configurator (Hosts)")
+            self.addForm("SelectCoresForm", SelectCoresForm, "Weka Configurator (Cores)")
+        except wekatui.wgwidget.NotEnoughSpaceForWidget:
+            log.error("Your window is too small to display the screen.  Please make it bigger.")
+            sys.exit(1)
+        except:
+            log.error("Unknown UI Error")
+            sys.exit(1)
 
     # on exit of application - when next form is None
     def onCleanExit(self):
