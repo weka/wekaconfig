@@ -45,7 +45,7 @@ class STEMHost(object):
         for drive in info_hw['disks']:
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
                     len(drive['pciAddr']) > 0 and drive['type'] == 'DISK':
-                    # not drive['isSwap'] and \     # pukes now; no longer there in 3.13
+                # not drive['isSwap'] and \     # pukes now; no longer there in 3.13
                 self.drives[drive['devName']] = drive['devPath']
 
         # need to determine if any of the above drives are actually in use - boot devices, root drives, etc.
@@ -57,8 +57,8 @@ class STEMHost(object):
         # remove any drives with mounted partitions from the list
         for drive in info_hw['disks']:
             if drive['type'] == "PARTITION" and drive['parentName'] in self.drives and drive['isMounted']:
-                #if drive['isSwap'] or drive['isMounted']:
-                    del self.drives[drive['parentName']]
+                # if drive['isSwap'] or drive['isMounted']:
+                del self.drives[drive['parentName']]
 
         for net_adapter in info_hw['net']['interfaces']:
             if (4000 < net_adapter['mtu'] < 10000) and len(net_adapter['ip4']) > 0:
@@ -279,11 +279,12 @@ def get_gateways(hostlist, ref_hostname, user, password):
 
 class WekaHostGroup():
     def __init__(self, reference_hostname, beacons):
-
-        # def find_valid_hosts(reference_hostname, beacons):
         """
+        This routine is run before the TUI starts to scope out the cluster.
+
         Using reference_hostname as a basis, find the other hosts that we can make into a cluster
         The idea is to narrow down the beacons list to something that will work
+        Then analyze the hosts (networks and whatnot) to see how we can configure things
 
         :param reference_hostname: hostname of the starter host (given on command line)
         :param beacons: dict of hostname:[list of ip addrs]
@@ -324,13 +325,14 @@ class WekaHostGroup():
 
         # find the basis host (the one they gave us on the command line)
         if self.reference_hostname not in candidates:
+            # something is amiss - the host they told us to talk to doesn't list itself as a STEM host?
             print(f"{self.reference_hostname} isn't in the list of good hosts?")
             sys.exit(1)
 
         self.referencehost_obj = candidates[self.reference_hostname]
 
-        candidates2 = dict()
         # find hosts that can cluster with reference_hostname - they pointed us at reference_hostname for a reason
+        candidates2 = dict()
         for hostname, hostobj in candidates.items():
             if hostobj.version != self.referencehost_obj.version:
                 print(f"host {hostname} is not running v{self.referencehost_obj.version} - ignoring")
@@ -340,15 +342,16 @@ class WekaHostGroup():
         del candidates
 
         print("Exploring network...")
-        self.ssh_client = open_ssh_connection(self.reference_hostname)
+        self.ssh_client = open_ssh_connection(self.reference_hostname)  # open an ssh to the reference host
 
         if self.ssh_client is None:
-            print(f"unable to ssh to {self.reference_hostname}")
-            self.usable_hosts = candidates2
-            return
+            log.error(f"ERROR: unable to ssh to {self.reference_hostname}")
+            sys.exit(1)
+            # self.usable_hosts = candidates2
+            # return
 
-        # make sure reference_hostname can talk to the others over the dataplane networks; narrow the list
-
+        # make sure reference_hostname can talk to the others over the dataplane networks; narrow the list,
+        # and collect details of what weka hosts we can see on each nic
         self.accessible_hosts = dict()  # a dict of {ifname:(hostname)}  (set of hostnames on the nic)
         self.pingable_ips = dict()
         numnets = dict()
@@ -360,7 +363,8 @@ class WekaHostGroup():
             for hostname, hostobj in candidates2.items():
                 for targetif, targetip in hostobj.nics.items():
                     if hostname == reference_hostname and source_interface == targetif:
-                        self.pingable_ips[source_interface].append(targetip) # should only add the ip on the source interface?
+                        self.pingable_ips[source_interface].append(
+                            targetip)  # should only add the ip on the source interface?
                         continue  # not sure why, but ping fails on loopback anyway
                     ssh_out = self.ssh_client.run_command(f"ping -c1 -W1 -I {source_interface} {targetip.ip}")
                     junk = list(ssh_out.stdout)  # gather output so we can get return code
@@ -372,14 +376,14 @@ class WekaHostGroup():
                         if targetip.network not in numnets[source_interface]:
                             numnets[source_interface].add(targetip.network)  # note unique networks
                     else:
-                        print(f"{hostname}: from {source_interface} target: {targetip} failed.")
+                        log.warning(f"{hostname}: from {source_interface} target: {targetip} failed.")
 
         # merge the accessible_hosts sets - we need the superset for later
         usable_set = set()  # should we really be using sets here?  A dict might work easier
         self.usable_hosts = dict()  # definitive list (well, dict) of hosts
         for host_set in self.accessible_hosts.values():
             if len(usable_set) != 0 and host_set != usable_set:
-                print("WARNING: Not all hosts are accessible from all interfaces - check network config")
+                log.warning("Not all hosts are accessible from all interfaces - check network config")
             usable_set = usable_set.union(host_set)
         for host in usable_set:
             self.usable_hosts[host] = candidates2[host]
@@ -391,7 +395,8 @@ class WekaHostGroup():
         for source_interface in self.referencehost_obj.nics.keys():
             if len(numnets[source_interface]) > 1:
                 self.isrouted = True
-        # are there more than one subnet on this host?
+
+        # is there more than one subnet on this host? (ie: are all the interfaces on the same subnet?)
         if not self.isrouted:
             self.local_subnets = []
             for source_interface, if_obj in self.referencehost_obj.nics.items():
@@ -406,16 +411,13 @@ class WekaHostGroup():
             if if_obj.type not in self.link_types:
                 self.link_types.append(if_obj.type)
 
-        # do we have both IB and ETH interfaces?
+        # do we have both IB and ETH interfaces? (maybe we should check this AFTER they select the dataplane?)
         if len(self.link_types) > 1:
             self.mixed_networking = True
         else:
             self.mixed_networking = False
 
-        # mixed networking looks routed.
-        #if self.isrouted and not self.mixed_networking:
-            # find gateways with "ip route get 8.8.8.8 oif enp2s0"
-        #print("Exploring Gateways")  # figure out what the gateways are...
+        # go probe the hosts to see if they have a default route set, if so, we'll config weka to use it
         get_gateways(self.usable_hosts, self.ssh_client.host, self.ssh_client.user, self.ssh_client.password)
 
 

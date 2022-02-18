@@ -37,8 +37,8 @@ class WekaTheme(wekatui.ThemeManager):
 class WekaConfigApp(wekatui.NPSAppManaged):
     STARTING_FORM = "SelectHostsForm"  # the first form to display
 
-    def __init__(self, hostlist):
-        self.target_hosts = hostlist  # STEMHost objects
+    def __init__(self, hostgroup):
+        self.target_hosts = hostgroup  # WekaHostGroup object
         self.selected_dps = list()
         self.selected_hosts = dict()
         self.selected_cores = None

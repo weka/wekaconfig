@@ -6,8 +6,6 @@ import curses.ascii
 
 import wekatui
 
-import logic
-
 movement_help = """Cursor movement:
     arrow keys: up, down, left, right - move between and within fields
     Space, Enter: select item
@@ -256,9 +254,10 @@ class ParityWidget(DataParityBase):
 
 class MemoryWidget(CoresWidgetBase):
     """specific for parity drives input"""
+
     def __init__(self, *args, label='', entry_field_width=4, relx=0, rely=0, **keywords):
-        begin_entry_at=len(label) +2    # leave room for ": "
-        self.editable = False   # default to not editable
+        begin_entry_at = len(label) + 2  # leave room for ": "
+        self.editable = False  # default to not editable
         super(MemoryWidget, self).__init__(*args, label=label, begin_entry_at=begin_entry_at,
                                            entry_field_width=entry_field_width, relx=relx, rely=rely, **keywords)
 
@@ -274,6 +273,7 @@ class MemoryWidget(CoresWidgetBase):
         PA = self.parent.parentApp
         PA.memory = self.intval
 
+
 class MiscWidget(wekatui.TitleMultiSelect):
     def when_value_edited(self):
         parent = self.parent
@@ -285,7 +285,6 @@ class MiscWidget(wekatui.TitleMultiSelect):
             parent.memory_field.display()
 
 
-
 # a widget for displaying how many hosts there are (read-only)
 class Hosts(wekatui.TitleMultiSelect):
     def when_value_edited(self):
@@ -293,6 +292,22 @@ class Hosts(wekatui.TitleMultiSelect):
         # update the "Number of hosts" field on the lower-left
         parent.num_hosts_field.set_value(' ' + str(len(parent.hosts_field.value)))
         parent.num_hosts_field.display()
+
+    def safe_to_exit(self):
+        # exiting after selecting the hosts...
+        # now might be a good time to determine if we have mixed networking, HA, or non-HA...
+        PA = self.parent.parentApp
+        if len(PA.selected_dps) > 1:
+            # then we've got either mixed networking or HA or both
+            for dpname in PA.selected_dps:
+                # if mixed networking, there should be both IB and ETH interfaces on the referencehost
+                # if possibly HA, the interfaces should be... what? on same net?  nah. ask user?
+                if dpname in self.target_hosts.referencehost_obj.info_hw.nis:
+                    pass
+        else:
+            PA.HA = False
+
+        # need tui field to show/select if ha or not...
 
 
 # a widget for selecting what the dataplane networks are
@@ -304,23 +319,19 @@ class Networks(wekatui.TitleMultiSelect):
         for index in self.parent.dataplane_networks_field.value:
             # save the IPv4Network objects corresponding to the selected items
             PA.possible_hosts |= PA.target_hosts.accessible_hosts[self.parent.nets[index]]
-            PA.selected_dps.append(self.parent.nets[index]) # ie: "ib0"
-        #self.parent.analyze_networks()
-        #PA.possible_hosts, PA.excluded_hosts = logic.filter_hosts(PA.selected_dps, PA.target_hosts)
-        #PA.sorted_hosts = sorted(PA.possible_hosts.keys())  # list of names, not STEMHost objects
-        #for host in list(PA.target_hosts.accessible_hosts[PA.selected_dps]): # list of STEMHosts
-        #    PA.possible_hosts[host.name] = host
+            PA.selected_dps.append(self.parent.nets[index])  # ie: "ib0"
+
         PA.sorted_hosts = sorted(list(PA.possible_hosts))  # sorted hostnames
-        PA.hosts_value = list(range(0, len(PA.sorted_hosts)))
+        PA.hosts_value = list(range(0, len(PA.sorted_hosts)))  # show all of them pre-selected
         if hasattr(self.parent, "hosts_field"):
             self.parent.hosts_field.set_value(PA.hosts_value)
             self.parent.hosts_field.set_values(sorted(PA.sorted_hosts))
             self.parent.hosts_field.when_value_edited()
-        #self.parent.num_hosts_field.set_value('  ' + str(len(PA.hosts_value)))
         self.parent.display()
 
     # is it ok to leave the field when they try to exit?   Make sure they select something
     def safe_to_exit(self):
+        # make sure they selected at least one dataplane network
         if len(self.parent.parentApp.selected_dps) == 0:
             return False
         return True

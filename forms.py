@@ -214,7 +214,7 @@ class SelectCoresForm(PrevDoneForm):
         if errors:
             # make noise
             wekatui.notify_confirm("The hosts are not homogenous; they have different numbers of cores.",
-                                     title="Error", form_color='STANDOUT', wrap=True, editw=1)
+                                   title="Error", form_color='STANDOUT', wrap=True, editw=1)
 
         return reference_cores
 
@@ -234,10 +234,10 @@ class SelectCoresForm(PrevDoneForm):
                 if drives != reference_drives:
                     errors = True
                     break
-        #if errors:
-            # make noise
-            #wekatui.notify_confirm("The hosts are not homogenous; they have different numbers of drives.",
-            #                         title="Error", form_color='STANDOUT', wrap=True, editw=1)
+        # if errors:
+        # make noise
+        # wekatui.notify_confirm("The hosts are not homogenous; they have different numbers of drives.",
+        #                         title="Error", form_color='STANDOUT', wrap=True, editw=1)
 
         return reference_drives
 
@@ -258,8 +258,7 @@ class SelectHostsForm(CancelNextForm):
                                                  max_height=5,  # not too big - need room below for next field
                                                  use_two_lines=True,  # input fields start on 2nd line
                                                  rely=2,  # put it high on the screen
-                                                 #max_width=38,  # leave room to the right for hosts entry
-                                                 max_width=80,  # leave room to the right for hosts entry
+                                                 max_width=72,
                                                  begin_entry_at=2,  # make the list under the title
                                                  name='Select DP Networks:',  # label/title
                                                  # values=["255.255.255.255/32 - 200 Gbps"]) # testing
@@ -272,8 +271,8 @@ class SelectHostsForm(CancelNextForm):
         self.hosts_field = self.add(Hosts, fieldname="hosts",
                                     scroll_exit=True,  # allow them to exit using arrow keys
                                     use_two_lines=True,  # input fields start on 2nd line
-                                    #rely=2,  # put it high on the screen
-                                    #relx=39,  # place to the right of Networks (above)
+                                    # rely=2,  # put it high on the screen
+                                    # relx=39,  # place to the right of Networks (above)
                                     relx=2, rely=10,
                                     begin_entry_at=2,  # make the list under the title
                                     name='Select Hosts:')
@@ -333,7 +332,7 @@ class SelectHostsForm(CancelNextForm):
                           f"{len(hostlist.accessible_hosts[iface])} hosts")
             self.nets.append(iface)
 
-        #for host in hostlist.usable_hosts.values():
+        # for host in hostlist.usable_hosts.values():
         #    for iface in host.nics.values():
         #        # network = ipaddress.IPv4Network(f"{iface['ip4']}/{iface['mask']}", strict=False)
         #        network = iface.network
