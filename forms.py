@@ -10,7 +10,8 @@ import wekatui
 log = getLogger(__name__)
 
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
-    NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts
+    NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts, \
+    HighAvailability
 
 from logic import Cores
 
@@ -274,20 +275,27 @@ class SelectHostsForm(CancelNextForm):
                                     # rely=2,  # put it high on the screen
                                     # relx=39,  # place to the right of Networks (above)
                                     relx=2, rely=10,
+                                    max_width=40,
                                     begin_entry_at=2,  # make the list under the title
                                     name='Select Hosts:')
         # values=["01234567890123456789012345678901234567890123456789", # testing
         #        "          1         2         3         4"] ) # testing
+        self.ha_field = self.add(HighAvailability, name="High Availability:",
+                                 scroll_exit=True,  # allow them to exit using arrow keys
+                                 rely=10, relx=41,
+                                 use_two_lines = True, editable=True,
+                                 begin_entry_at=2,  # make the list under the title
+                                 values=["Yes", "No"])
 
     def on_ok(self):
         PA = self.parentApp
-        PA.selected_hosts = dict()  # toss any old values
-        if len(self.hosts_field.value) < 5:
-            # they didn't select any
-            wekatui.notify_wait("You must select at least 5 hosts", title='ERROR')
-            return
-        for index in self.hosts_field.value:  # an index into the orig list, ie: [0,2,4,6,7]
-            PA.selected_hosts[PA.sorted_hosts[index]] = PA.target_hosts.usable_hosts[PA.sorted_hosts[index]]
+        #PA.selected_hosts = dict()  # toss any old values
+        #if len(self.hosts_field.value) < 5:
+        #    # they didn't select any
+        #    wekatui.notify_wait("You must select at least 5 hosts", title='ERROR')
+        #    return
+        #for index in self.hosts_field.value:  # an index into the orig list, ie: [0,2,4,6,7]
+        #    PA.selected_hosts[PA.sorted_hosts[index]] = PA.target_hosts.usable_hosts[PA.sorted_hosts[index]]
 
         # find the amount of RAM we can use...  min of all hosts in the cluster
         for host in PA.selected_hosts.values():
@@ -296,6 +304,11 @@ class SelectHostsForm(CancelNextForm):
                     PA.min_host_ramGB = int(host.total_ramGB)
             except AttributeError:  # haven't set self.min_host_ramGB yet...
                 PA.min_host_ramGB = int(host.total_ramGB)
+
+        if self.ha_field.value == [0]:
+            PA.HighAvailability = True
+        else:
+            PA.HighAvailability = False
 
         PA.setNextForm("SelectCoresForm")
 

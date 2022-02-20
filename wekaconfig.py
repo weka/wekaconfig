@@ -3,6 +3,7 @@
 ################################################################################################
 import argparse
 import logging
+import sys
 
 from apps import WekaConfigApp
 from output import WekaCluster
@@ -19,6 +20,10 @@ if __name__ == '__main__':
     parser.add_argument("--version", dest="version", default=False, action="store_true",
                         help="Display version number")
     args = parser.parse_args()
+
+    if args.version:
+        print(f"{args.prog} version 1.0.0")
+        sys.exit(0)
 
     configure_logging(log, args.verbosity)
 
