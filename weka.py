@@ -237,13 +237,13 @@ def open_ssh_connection(hostname, user=None, password=None, proxy_host=None):
         message_format , host, port, reason = exc.args
         reason_text = reason.args[0]
         message = message_format % (host, port, reason_text)
-        print(f"{message}")
+        print(f"AuthenticationError: {message}")
         pass
     except pssh.exceptions.ProxyError as exc:
         print(f"proxy error {exc}")
         pass
     except Exception as exc:
-        print(f"caught exception {exc}")
+        print(f"caught exception {exc.args}")
         pass
 
     # try a user/pass, if given
@@ -276,7 +276,7 @@ def open_ssh_connection(hostname, user=None, password=None, proxy_host=None):
         except pssh.exceptions.AuthenticationError as exc:
             print(f"userid/password rejected, please try again")
         except Exception as exc:
-            print(f"{exc.args}")
+            print(f"Exception: {exc.args}")
 
 
 dataplane_hostsfile = dict()
@@ -408,6 +408,7 @@ class WekaHostGroup():
             numnets[source_interface] = set()
             for hostname, hostobj in candidates2.items():
                 print(f"Looking at host {hostname}...")
+                # see if the reference host can talk to the target ip on each interface
                 for targetif, targetip in hostobj.nics.items():
                     if hostname == reference_hostname and source_interface == targetif:
                         self.pingable_ips[source_interface].append(
