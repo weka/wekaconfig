@@ -215,7 +215,7 @@ def ask_for_credentials():
     return (user, password)
 
 
-def open_ssh_connection(hostname, user=None, password=None, proxy_host=None):
+def open_ssh_connection(hostname, ipaddr=None, user=None, password=None, proxy_host=None):
     """
     reliably open an ssh connection to the host - does not return unless successful
     :param hostname:
@@ -289,16 +289,10 @@ def get_gateways(hostlist, ref_hostname, user, password):
     for host, host_obj in hostlist.items():
         # open sessions to all the hosts
         print(f"Opening ssh to {host}")
-        #try:
-            #clients[host] = SSHClient(host,
         clients[host] = open_ssh_connection(host,
                                       user=user,
                                       password=password,
                                       proxy_host=ref_hostname)
-                                      #num_retries=1, retry_delay=1)
-        #except Exception as exc:
-        #    print(f"{exc}")
-        #    continue  # should a failure here be catastrophic?
 
         print(f"connection to {host} established")
         host_out[host] = dict()
