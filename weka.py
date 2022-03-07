@@ -452,7 +452,7 @@ class WekaHostGroup():
                 else:
                     print(f"Error executing 'ip route get' on {host}:{nic_obj.name}:"+
                           f" return code={cmd_output.exit_code}," +
-                          f" stderr={cmd_output.stderr}")
+                          f" stderr={list(cmd_output.stderr)}")
 
         for name, client in clients.items():
             log.debug(f"Closing ssh to {name}")
