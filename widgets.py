@@ -290,25 +290,50 @@ class Hosts(wekatui.TitleMultiSelect):
     def when_value_edited(self):
         parent = self.parent
         # update the "Number of hosts" field on the lower-left
-        parent.num_hosts_field.set_value(' ' + str(len(parent.hosts_field.value)))
+        parent.num_hosts_field.set_value(' ' + str(len(self.value)))
         parent.num_hosts_field.display()
 
-    def safe_to_exit(self):
         # exiting after selecting the hosts...
         # now might be a good time to determine if we have mixed networking, HA, or non-HA...
         PA = self.parent.parentApp
+        PA.selected_hosts = dict()  # toss any old values
+        for index in self.value:  # an index into the orig list, ie: [0,2,4,6,7]
+            PA.selected_hosts[PA.sorted_hosts[index]] = PA.target_hosts.usable_hosts[PA.sorted_hosts[index]]
+
+        # if len(PA.selected_dps) > 1:
+        #    # then we've got either mixed networking or HA or both
+        #    for dpname in PA.selected_dps:
+        #        # if mixed networking, there should be both IB and ETH interfaces on the referencehost
+        #        # if possibly HA, the interfaces should be... what? on same net?  nah. ask user?
+        #        if dpname in PA.target_hosts.referencehost_obj.nics:
+        #            pass
+        # else:
+        #    PA.HA = False
+
+    def safe_to_exit(self):
+        parent = self.parent
+        PA = parent.parentApp
+        if len(self.value) < 5:
+            # they didn't select any
+            wekatui.notify_wait("You must select at least 5 hosts", title='ERROR')
+            return False
         if len(PA.selected_dps) > 1:
-            # then we've got either mixed networking or HA or both
-            for dpname in PA.selected_dps:
-                # if mixed networking, there should be both IB and ETH interfaces on the referencehost
-                # if possibly HA, the interfaces should be... what? on same net?  nah. ask user?
-                if dpname in PA.target_hosts.referencehost_obj.info_hw.nics:
-                    pass
+            parent.ha_field.set_value([0])
+            parent.ha_field.editable = True
         else:
-            PA.HA = False
+            parent.ha_field.set_value([1])
+            parent.ha_field.editable = False
+        parent.ha_field.display()
         return True
 
         # need tui field to show/select if ha or not...
+
+
+class HighAvailability(wekatui.TitleSelectOne):
+    _contained_widgets = wekatui.CheckBox
+
+    def __init__(self, *args, **keywords):
+        super().__init__(*args, **keywords)
 
 
 # a widget for selecting what the dataplane networks are

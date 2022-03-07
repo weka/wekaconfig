@@ -14,6 +14,8 @@ try:
 except ImportError:
     from pssh.clients.ssh import SSHClient, ParallelSSHClient
 
+import pssh.exceptions
+
 import getpass
 
 from wekalib.exceptions import LoginError, CommunicationError, NewConnectionError
@@ -213,19 +215,53 @@ def ask_for_credentials():
     return (user, password)
 
 
-def open_ssh_connection(hostname):
+def open_ssh_connection(hostname, ipaddr=None, user=None, password=None, proxy_host=None):
     """
     reliably open an ssh connection to the host - does not return unless successful
     :param hostname:
     :return:
     """
     ssh_client = None
+    #print(f"Trying to ssh to {hostname}")
     try:
-        # try with keys
-        ssh_client = SSHClient(hostname, num_retries=1, retry_delay=1)
-    except:
+        #ssh_client = SSHClient(hostname, num_retries=1, retry_delay=1, proxy_host=proxy_host)
+        ssh_client = SSHClient(hostname,
+                               user=user,
+                               password=password,
+                               proxy_host=proxy_host,
+                               num_retries=1, retry_delay=1)
+
+        return ssh_client
+    except pssh.exceptions.AuthenticationError as exc:
+        #print(f"auth error {exc}")
+        message_format , host, port, reason = exc.args
+        reason_text = reason.args[0]
+        message = message_format % (host, port, reason_text)
+        print(f"AuthenticationError: {message}")
+        pass
+    except pssh.exceptions.ProxyError as exc:
+        print(f"proxy error {exc}")
+        pass
+    except Exception as exc:
+        print(f"caught exception {exc.args}")
         pass
 
+    # try a user/pass, if given
+    #if user is not None:
+    #    try:
+    #        print(f"Trying passed password to {hostname}")
+    #        ssh_client = SSHClient(hostname,
+    #                               user=user,
+    #                               password=password,
+    #                               proxy_host=proxy_host,
+    #                               num_retries=1, retry_delay=1)
+    #
+    #        return ssh_client
+    #    except:
+    #        print(f"{exc}")
+    #        pass
+
+    # resort to asking for a user/pass
     while ssh_client is None:
         # keys didn't work - ask for user/password - keep trying if they mistype it
         print(f"Please enter credentials for {hostname}")
@@ -234,11 +270,13 @@ def open_ssh_connection(hostname):
             ssh_client = SSHClient(hostname,
                                    user=user,
                                    password=password,
-                                   num_retries=1, retry_delay=1)
-        except:
-            pass
-
-    return ssh_client
+                                   proxy_host=proxy_host,
+                                   num_retries = 1, retry_delay = 1)
+            return ssh_client
+        except pssh.exceptions.AuthenticationError as exc:
+            print(f"userid/password rejected, please try again")
+        except Exception as exc:
+            print(f"Exception: {exc.args}")
 
 
 dataplane_hostsfile = dict()
@@ -251,15 +289,12 @@ def get_gateways(hostlist, ref_hostname, user, password):
     for host, host_obj in hostlist.items():
         # open sessions to all the hosts
         print(f"Opening ssh to {host}")
-        try:
-            clients[host] = SSHClient(host,
+        clients[host] = open_ssh_connection(host,
                                       user=user,
                                       password=password,
-                                      proxy_host=ref_hostname,
-                                      num_retries=1, retry_delay=1)
-        except:
-            continue  # should a failure here be catastrophic?
+                                      proxy_host=ref_hostname)
 
+        print(f"connection to {host} established")
         host_out[host] = dict()
         for nic, nic_obj in host_obj.nics.items():
             print(f"    Scanning {host}:{nic}")
@@ -275,6 +310,10 @@ def get_gateways(hostlist, ref_hostname, user, password):
             if splitlines[1] == 'via':  # There's a gateway!
                 nic_obj.gateway = splitlines[2]
                 print(f"    Host {host}:{nic} has gateway {nic_obj.gateway}")
+
+    for name, client in clients.items():
+        log.debug(f"Closing ssh to {name}")
+        client.disconnect()
 
 
 class WekaHostGroup():
@@ -341,7 +380,7 @@ class WekaHostGroup():
 
         del candidates
 
-        print("Exploring network...")
+        print("Preparing to explore network...")
         self.ssh_client = open_ssh_connection(self.reference_hostname)  # open an ssh to the reference host
 
         if self.ssh_client is None:
@@ -350,6 +389,7 @@ class WekaHostGroup():
             # self.usable_hosts = candidates2
             # return
 
+        print("Exploring network... this may take a while")
         # make sure reference_hostname can talk to the others over the dataplane networks; narrow the list,
         # and collect details of what weka hosts we can see on each nic
         self.accessible_hosts = dict()  # a dict of {ifname:(hostname)}  (set of hostnames on the nic)
@@ -361,6 +401,8 @@ class WekaHostGroup():
             self.pingable_ips[source_interface] = list()
             numnets[source_interface] = set()
             for hostname, hostobj in candidates2.items():
+                print(f"Looking at host {hostname}...")
+                # see if the reference host can talk to the target ip on each interface
                 for targetif, targetip in hostobj.nics.items():
                     if hostname == reference_hostname and source_interface == targetif:
                         self.pingable_ips[source_interface].append(
@@ -419,6 +461,9 @@ class WekaHostGroup():
 
         # go probe the hosts to see if they have a default route set, if so, we'll config weka to use it
         get_gateways(self.usable_hosts, self.ssh_client.host, self.ssh_client.user, self.ssh_client.password)
+
+        # We're done with the ssh sessions now.
+        self.ssh_client.disconnect()
 
 
 def scan_hosts(reference_hostname):
