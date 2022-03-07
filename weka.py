@@ -448,9 +448,10 @@ class WekaHostGroup():
                     splitlines = outputlines[0].split()
                     if splitlines[1] == 'via':  # There's a gateway!
                         nic_obj.gateway = splitlines[2]
-                        print(f"    Host {host}:{nic} has gateway {nic_obj.gateway}")
+                        print(f"    Host {host}:{nic_obj.name} has gateway {nic_obj.gateway}")
                 else:
-                    print(f"Error executing 'ip route get' on {host}:{nic}: return code={cmd_output.exit_code}," +
+                    print(f"Error executing 'ip route get' on {host}:{nic_obj.name}:"+
+                          f" return code={cmd_output.exit_code}," +
                           f" stderr={cmd_output.stderr}")
 
         for name, client in clients.items():
