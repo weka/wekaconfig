@@ -383,7 +383,7 @@ class WekaHostGroup():
                                        user=user,
                                        password=password,
                                        proxy_host=proxy_host,
-                                       num_retries=1, retry_delay=1)
+                                       num_retries=1, retry_delay=1, timeout=5.0)
 
                 return ssh_client
             except pssh.exceptions.AuthenticationError as exc:
@@ -411,7 +411,7 @@ class WekaHostGroup():
                                            user=user,
                                            password=password,
                                            proxy_host=proxy_host,
-                                           num_retries=1, retry_delay=1)
+                                           num_retries=1, retry_delay=1, timeout=5.0)
                     return ssh_client
                 except pssh.exceptions.AuthenticationError as exc:
                     print(f"userid/password rejected, please try again")
@@ -444,10 +444,14 @@ class WekaHostGroup():
         for host, host_obj in hostlist.items():
             for nic_obj, cmd_output in host_out[host].items():
                 outputlines = list(cmd_output.stdout)
-                splitlines = outputlines[0].split()
-                if splitlines[1] == 'via':  # There's a gateway!
-                    nic_obj.gateway = splitlines[2]
-                    print(f"    Host {host}:{nic} has gateway {nic_obj.gateway}")
+                if len(outputlines) > 0:
+                    splitlines = outputlines[0].split()
+                    if splitlines[1] == 'via':  # There's a gateway!
+                        nic_obj.gateway = splitlines[2]
+                        print(f"    Host {host}:{nic} has gateway {nic_obj.gateway}")
+                else:
+                    print(f"Error executing 'ip route get' on {host}:{nic}: return code={cmd_output.exit_code}," +
+                          " stderr={cmd_output.stderr}")
 
         for name, client in clients.items():
             log.debug(f"Closing ssh to {name}")
