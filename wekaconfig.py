@@ -3,6 +3,7 @@
 ################################################################################################
 import argparse
 import logging
+import os
 import sys
 
 from apps import WekaConfigApp
@@ -22,10 +23,14 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.version:
-        print(f"{args.prog} version 1.0.0")
+        print(f"{args.prog} version 1.0.1")
         sys.exit(0)
 
     configure_logging(log, args.verbosity)
+
+    # hack for Ubuntu's broken definition of xterm-256color
+    if os.environ["TERM"] == "xterm-256color" and not os.exists("/usr/share/terminfo/x/xterm-256color"):
+        os.environ["TERMINFO"] = os.getcwd()    # we carry our own definition
 
     if args.host == "localhost":
         import platform
