@@ -29,7 +29,7 @@ if __name__ == '__main__':
     configure_logging(log, args.verbosity)
 
     # hack for Ubuntu's broken definition of xterm-256color
-    if os.environ["TERM"] == "xterm-256color" and not os.exists("/usr/share/terminfo/x/xterm-256color"):
+    if os.environ["TERM"] == "xterm-256color" and not os.path.exists("/usr/share/terminfo/x/xterm-256color"):
         os.environ["TERMINFO"] = os.getcwd()    # we carry our own definition
 
     if args.host == "localhost":
