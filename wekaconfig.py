@@ -15,6 +15,7 @@ from wekalogging import configure_logging
 log = logging.getLogger()
 
 if __name__ == '__main__':
+    progname = sys.argv[0]
     parser = argparse.ArgumentParser(description="Weka Cluster Configurator")
     parser.add_argument("host", type=str, nargs="?", help="a host to talk to", default="localhost")
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="increase output verbosity")
@@ -28,9 +29,14 @@ if __name__ == '__main__':
 
     configure_logging(log, args.verbosity)
 
+    try:
+        wd = sys._MEIPASS  # for PyInstaller - this is the temp dir where we are unpacked
+    except AttributeError:
+        wd = os.path.dirname(progname)
+
     # hack for Ubuntu's broken definition of xterm-256color
     if os.environ["TERM"] == "xterm-256color" and not os.path.exists("/usr/share/terminfo/x/xterm-256color"):
-        os.environ["TERMINFO"] = f"{os.getcwd()}/terminfo"   # we carry our own definition
+        os.environ["TERMINFO"] = f"{wd}/terminfo"   # we carry our own definition
         print(f"Setting TERMINFO to {os.environ['TERMINFO']}")
 
     if args.host == "localhost":
