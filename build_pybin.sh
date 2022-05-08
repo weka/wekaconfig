@@ -28,7 +28,7 @@ pyinstaller --hidden-import npyscreen \
             --hidden-import ssh.sftp_handles \
             --hidden-import ssh.sftp_statvfs \
             --hidden-import ssh.scp \
-            --add-data xterm-256color:xterm-256color
+            --add-data xterm-256color:xterm-256color \
             --onefile $MAIN
 
 mkdir -p $TARGET
