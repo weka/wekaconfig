@@ -139,7 +139,7 @@ def beacon_hosts(hostname):
             stem_beacons[hostname].append(ip)
 
     for host, ips in stem_beacons.items():
-        print(f"{host}: {ips}")
+        print(f"{host}: {sorted(ips)}")
 
     return OrderedDict(sorted(stem_beacons.items()))
 
