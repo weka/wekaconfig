@@ -34,8 +34,8 @@ if __name__ == '__main__':
     except AttributeError:
         wd = os.path.dirname(progname)
 
-    # hack for Ubuntu's broken definition of xterm-256color
-    if os.environ["TERM"] == "xterm-256color" and not os.path.exists("/usr/share/terminfo/x/xterm-256color"):
+    # hack for broken definition of xterm-256color
+    if os.environ["TERM"] == "xterm-256color":
         os.environ["TERMINFO"] = f"{wd}/terminfo"   # we carry our own definition
         print(f"Setting TERMINFO to {os.environ['TERMINFO']}")
 
