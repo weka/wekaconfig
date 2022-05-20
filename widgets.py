@@ -228,8 +228,10 @@ class DataWidget(DataParityBase):
     """specific for data drives input"""
 
     def _check_value(self):
-        if self.intval not in range(3, self.clustersize - 1):
-            return f"Data drives must be between 3 and {self.clustersize - 2}"
+        PA = self.parent.parentApp
+        max_data = (self.clustersize - PA.paritydrives) if self.clustersize < (16 + PA.paritydrives) else 16
+        if self.intval not in range(3, max_data +1):
+            return f"Data drives must be between 3 and {max_data}"
         return None
 
     def set_values(self):
