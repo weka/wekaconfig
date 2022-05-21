@@ -47,6 +47,7 @@ class WekaConfigApp(wekatui.NPSAppManaged):
         self.datadrives = None
         self.paritydrives = None
         self.cleanexit = False
+        self.hot_spares = 1
         self.misc = [0, 1, 2]
         self.dedicated = None
         self.auto_failure_domain = None

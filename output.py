@@ -131,7 +131,7 @@ class WekaCluster(object):
             return []
 
     def _hot_spare(self):
-        return "hot-spare 1"
+        return f"hot-spare {self.config.hot_spares}"
 
     def _cloud(self):
         if self.config.cloud_enable:

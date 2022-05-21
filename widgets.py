@@ -254,6 +254,20 @@ class ParityWidget(DataParityBase):
         PA.paritydrives = self.intval
 
 
+class SparesWidget(DataParityBase):
+    """specific for data drives input"""
+
+    def _check_value(self):
+        PA = self.parent.parentApp
+        if self.intval not in range(0, PA.datadrives -2):
+            return f"Hot Spares must be between 0 and {PA.datadrives -3}"
+        return None
+
+    def set_values(self):
+        PA = self.parent.parentApp
+        PA.hot_spares = self.intval
+
+
 class MemoryWidget(CoresWidgetBase):
     """specific for parity drives input"""
 

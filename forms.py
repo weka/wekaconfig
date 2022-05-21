@@ -11,7 +11,7 @@ log = getLogger(__name__)
 
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
     NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts, \
-    HighAvailability
+    HighAvailability, SparesWidget
 
 from logic import Cores
 
@@ -81,6 +81,8 @@ class SelectCoresForm(PrevDoneForm):
         self.nextrely += 1
         self.data_field = self.add(DataWidget, label="Data Drives", entry_field_width=2)
         self.parity_field = self.add(ParityWidget, label="Parity Drives", entry_field_width=2)
+        self.nextrely += 1
+        self.spares_field = self.add(SparesWidget, label="Hot Spares", entry_field_width=2)
 
         self.align_fields()
 
@@ -164,6 +166,7 @@ class SelectCoresForm(PrevDoneForm):
 
         self.data_field.set_value(str(PA.datadrives))
         self.parity_field.set_value(str(PA.paritydrives))
+        self.spares_field.set_value(str(PA.hot_spares))
         self.misc_field.set_value(PA.misc)
 
     # save the values that are on the screen so we can repopulate it later
@@ -176,6 +179,7 @@ class SelectCoresForm(PrevDoneForm):
         PA.clustername = self.name_field.value
         PA.datadrives = int(self.data_field.value)
         PA.paritydrives = int(self.parity_field.value)
+        PA.hot_spares = int(self.spares_field.value)
         PA.misc = self.misc_field.value
         PA.dedicated = True if 0 in self.misc_field.value else False
         PA.auto_failure_domain = True if 1 in self.misc_field.value else False
