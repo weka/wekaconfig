@@ -287,18 +287,18 @@ class SelectHostsForm(CancelNextForm):
         self.ha_field = self.add(HighAvailability, name="High Availability:",
                                  scroll_exit=True,  # allow them to exit using arrow keys
                                  rely=10, relx=41,
-                                 use_two_lines = True, editable=True,
+                                 use_two_lines=True, editable=True,
                                  begin_entry_at=2,  # make the list under the title
                                  values=["Yes", "No"])
 
     def on_ok(self):
         PA = self.parentApp
-        #PA.selected_hosts = dict()  # toss any old values
-        #if len(self.hosts_field.value) < 5:
+        # PA.selected_hosts = dict()  # toss any old values
+        # if len(self.hosts_field.value) < 5:
         #    # they didn't select any
         #    wekatui.notify_wait("You must select at least 5 hosts", title='ERROR')
         #    return
-        #for index in self.hosts_field.value:  # an index into the orig list, ie: [0,2,4,6,7]
+        # for index in self.hosts_field.value:  # an index into the orig list, ie: [0,2,4,6,7]
         #    PA.selected_hosts[PA.sorted_hosts[index]] = PA.target_hosts.usable_hosts[PA.sorted_hosts[index]]
 
         # find the amount of RAM we can use...  min of all hosts in the cluster

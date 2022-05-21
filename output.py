@@ -23,13 +23,13 @@ class WekaCluster(object):
             hostid += 1
 
         # host-ips
-        #if self.config.HighAvailability:
+        # if self.config.HighAvailability:
         output += "--host-ips="
         for hostname, host in sorted(self.config.selected_hosts.items()):
             this_hosts_ifs = set()
             count = 0
             for interface in self.config.selected_dps:
-                iplist = self.config.target_hosts.pingable_ips[interface] # list of ips accessible via the interface
+                iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
                 for host_int, nic in host.nics.items():
                     if nic in iplist:
                         this_hosts_ifs.add(nic)
@@ -52,7 +52,7 @@ class WekaCluster(object):
         for hostname, host in sorted(self.config.selected_hosts.items()):
             this_hosts_ifs = set()
             for interface in self.config.selected_dps:
-                iplist = self.config.target_hosts.pingable_ips[interface] # list of ips accessible via the interface
+                iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
                 for host_int, nic in host.nics.items():
                     if nic in iplist:
                         this_hosts_ifs.add(nic)
@@ -75,7 +75,7 @@ class WekaCluster(object):
             thishost = base + str(host.host_id) + ' '
             for drive in sorted(host.drives.values()):
                 thishost += drive + ' '
-            #thishost += '--force'  # don't force it - can overwrite boot drives!
+            # thishost += '--force'  # don't force it - can overwrite boot drives!
             result.append(thishost)
             # host_id += 1
         return result
@@ -153,8 +153,8 @@ class WekaCluster(object):
         pass
 
     def cluster_config(self, file):
-        WEKA_CLUSTER = "sudo weka cluster "
-        WEKA = "sudo weka "
+        WEKA_CLUSTER = "weka cluster "
+        WEKA = "weka "
         NL = "\n"
         with file as fp:
             fp.write(WEKA_CLUSTER + self._create() + NL)
@@ -177,8 +177,8 @@ class WekaCluster(object):
             if name is not None:
                 fp.write(WEKA_CLUSTER + name + NL)
             fp.write(WEKA_CLUSTER + self._apply() + NL)
-            #fp.write("sleep 60\n")
-            #fp.write(WEKA_CLUSTER + self._start_io() + NL) # won't start without license in 3.14+
+            # fp.write("sleep 60\n")
+            # fp.write(WEKA_CLUSTER + self._start_io() + NL) # won't start without license in 3.14+
 
     def dump(self, file):
         pass
