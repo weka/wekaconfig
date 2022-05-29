@@ -11,7 +11,7 @@ log = getLogger(__name__)
 
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
     NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts, \
-    HighAvailability
+    HighAvailability, SparesWidget
 
 from logic import Cores
 
@@ -81,6 +81,8 @@ class SelectCoresForm(PrevDoneForm):
         self.nextrely += 1
         self.data_field = self.add(DataWidget, label="Data Drives", entry_field_width=2)
         self.parity_field = self.add(ParityWidget, label="Parity Drives", entry_field_width=2)
+        self.nextrely += 1
+        self.spares_field = self.add(SparesWidget, label="Hot Spares", entry_field_width=2)
 
         self.align_fields()
 
@@ -164,6 +166,7 @@ class SelectCoresForm(PrevDoneForm):
 
         self.data_field.set_value(str(PA.datadrives))
         self.parity_field.set_value(str(PA.paritydrives))
+        self.spares_field.set_value(str(PA.hot_spares))
         self.misc_field.set_value(PA.misc)
 
     # save the values that are on the screen so we can repopulate it later
@@ -176,6 +179,7 @@ class SelectCoresForm(PrevDoneForm):
         PA.clustername = self.name_field.value
         PA.datadrives = int(self.data_field.value)
         PA.paritydrives = int(self.parity_field.value)
+        PA.hot_spares = int(self.spares_field.value)
         PA.misc = self.misc_field.value
         PA.dedicated = True if 0 in self.misc_field.value else False
         PA.auto_failure_domain = True if 1 in self.misc_field.value else False
@@ -283,18 +287,18 @@ class SelectHostsForm(CancelNextForm):
         self.ha_field = self.add(HighAvailability, name="High Availability:",
                                  scroll_exit=True,  # allow them to exit using arrow keys
                                  rely=10, relx=41,
-                                 use_two_lines = True, editable=True,
+                                 use_two_lines=True, editable=True,
                                  begin_entry_at=2,  # make the list under the title
                                  values=["Yes", "No"])
 
     def on_ok(self):
         PA = self.parentApp
-        #PA.selected_hosts = dict()  # toss any old values
-        #if len(self.hosts_field.value) < 5:
+        # PA.selected_hosts = dict()  # toss any old values
+        # if len(self.hosts_field.value) < 5:
         #    # they didn't select any
         #    wekatui.notify_wait("You must select at least 5 hosts", title='ERROR')
         #    return
-        #for index in self.hosts_field.value:  # an index into the orig list, ie: [0,2,4,6,7]
+        # for index in self.hosts_field.value:  # an index into the orig list, ie: [0,2,4,6,7]
         #    PA.selected_hosts[PA.sorted_hosts[index]] = PA.target_hosts.usable_hosts[PA.sorted_hosts[index]]
 
         # find the amount of RAM we can use...  min of all hosts in the cluster
@@ -344,13 +348,5 @@ class SelectHostsForm(CancelNextForm):
             output.append(f"{iface}: {nic.with_prefixlen} - {nic.type}, {int(nic.speed / 1000)} Gbps, " +
                           f"{len(hostlist.accessible_hosts[iface])} hosts")
             self.nets.append(iface)
-
-        # for host in hostlist.usable_hosts.values():
-        #    for iface in host.nics.values():
-        #        # network = ipaddress.IPv4Network(f"{iface['ip4']}/{iface['mask']}", strict=False)
-        #        network = iface.network
-        #        if network not in self.nets:
-        #            self.nets.append(network)
-        #            output.append(f"{iface.type}: {network} - {int(iface.speed / 1000)} Gbps")
 
         return output
