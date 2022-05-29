@@ -9,7 +9,10 @@ import sys
 from apps import WekaConfigApp
 from output import WekaCluster
 from weka import scan_hosts
-from wekalogging import configure_logging
+#from wekalogging import configure_logging
+
+from wekapyutils.wekalogging import configure_logging, register_module, DEFAULT
+
 
 # get root logger
 log = logging.getLogger()
@@ -27,6 +30,13 @@ if __name__ == '__main__':
         print(f"{args.prog} version 1.0.1")
         sys.exit(0)
 
+    register_module("paramiko", logging.ERROR)
+    register_module("weka", logging.ERROR)
+    register_module("widgets", logging.ERROR)
+    register_module("logic", logging.ERROR)
+    register_module("forms", logging.ERROR)
+    register_module("wekalib", logging.ERROR)
+    register_module("urllib3", logging.ERROR)
     configure_logging(log, args.verbosity)
 
     try:
