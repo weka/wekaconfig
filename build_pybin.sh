@@ -5,8 +5,7 @@ TOOL=`basename $PWD`
 MAIN=$TOOL.py
 TARGET=tarball/$TOOL
 
-pyinstaller --hidden-import npyscreen \
-            --add-data terminfo:terminfo \
+pyinstaller --add-data terminfo:terminfo \
             --onefile $MAIN
 
 mkdir -p $TARGET
