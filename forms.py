@@ -347,7 +347,8 @@ class SelectHostsForm(CancelNextForm):
         for iface, nic in sorted(hostlist.referencehost_obj.nics.items()):
             output.append(f"{iface}: {nic.with_prefixlen} - {nic.type}, {int(nic.speed / 1000)} Gbps, " +
                           f"{len(hostlist.accessible_hosts[iface])} hosts")
-            self.nets.append(iface)
+            #self.nets.append(iface)
+            self.nets.append(nic.network)
 
         # for host in hostlist.usable_hosts.values():
         #    for iface in host.nics.values():

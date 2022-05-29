@@ -361,7 +361,7 @@ class Networks(wekatui.TitleMultiSelect):
         for index in self.parent.dataplane_networks_field.value:
             # save the IPv4Network objects corresponding to the selected items
             PA.possible_hosts |= PA.target_hosts.accessible_hosts[self.parent.nets[index]]
-            PA.selected_dps.append(self.parent.nets[index])  # ie: "ib0"
+            PA.selected_dps.append(self.parent.nets[index])  # ie: "ib0" ?network number?
 
         PA.sorted_hosts = sorted(list(PA.possible_hosts))  # sorted hostnames
         PA.hosts_value = list(range(0, len(PA.sorted_hosts)))  # show all of them pre-selected
