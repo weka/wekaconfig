@@ -9,12 +9,14 @@ from logging import getLogger
 
 log = getLogger(__name__)
 
-try:
-    from pssh.clients import SSHClient, ParallelSSHClient
-except ImportError:
-    from pssh.clients.ssh import SSHClient, ParallelSSHClient
+from wekapyutils.wekassh import RemoteServer, parallel, pdsh
 
-import pssh.exceptions
+#try:
+#    from pssh.clients import SSHClient, ParallelSSHClient
+#except ImportError:
+#    from pssh.clients.ssh import SSHClient, ParallelSSHClient
+#
+#import pssh.exceptions
 
 import getpass
 
@@ -203,16 +205,16 @@ def get_machine_info(host, host_api):
     return machine_info
 
 
-def ask_for_credentials():
-    actual_user = getpass.getuser()
-    print(f"Username({actual_user}): ", end='')
-    user = input()
-    if len(user) == 0:
-        user = actual_user
-
-    password = getpass.getpass()
-    print()
-    return (user, password)
+#def ask_for_credentials():
+#    actual_user = getpass.getuser()
+#    print(f"Username({actual_user}): ", end='')
+#    user = input()
+#    if len(user) == 0:
+#        user = actual_user
+#
+#    password = getpass.getpass()
+#    print()
+#    return (user, password)
 
 
 dataplane_hostsfile = dict()
@@ -284,8 +286,11 @@ class WekaHostGroup():
         del candidates
 
         print("Preparing to explore network...")
-        self.ssh_client = self.open_ssh_connection(self.reference_hostname)  # open an ssh to the reference host
+        #self.ssh_client = self.open_ssh_connection(self.reference_hostname)  # open an ssh to the reference host
+        self.ssh_client = RemoteServer(self.reference_hostname)
+        self.ssh_client.connect()
 
+        # not sure this is still needed
         if self.ssh_client is None:
             log.error(f"ERROR: unable to ssh to {self.reference_hostname}")
             sys.exit(1)
@@ -311,9 +316,11 @@ class WekaHostGroup():
                         self.pingable_ips[source_interface].append(
                             targetip)  # should only add the ip on the source interface?
                         continue  # not sure why, but ping fails on loopback anyway
-                    ssh_out = self.ssh_client.run_command(f"ping -c1 -W1 -I {source_interface} {targetip.ip}")
-                    junk = list(ssh_out.stdout)  # gather output so we can get return code
-                    if ssh_out.exit_code == 0:
+                    #ssh_out = self.ssh_client.run_command(f"ping -c1 -W1 -I {source_interface} {targetip.ip}")
+                    ssh_out = self.ssh_client.run(f"ping -c1 -W1 -I {source_interface} {targetip.ip}")
+                    #junk = list(ssh_out.stdout)  # gather output so we can get return code
+                    #if ssh_out.exit_code == 0:
+                    if ssh_out.status == 0:
                         # we were able to ping the host!  add it to the set of hosts we can access via this IF
                         self.accessible_hosts[source_interface].add(hostobj.name)
                         self.pingable_ips[source_interface].append(targetip)
@@ -363,62 +370,63 @@ class WekaHostGroup():
             self.mixed_networking = False
 
         # go probe the hosts to see if they have a default route set, if so, we'll config weka to use it
-        self.get_gateways(self.usable_hosts, self.ssh_client.host, self.ssh_client.user, self.ssh_client.password)
+        self.get_gateways(self.usable_hosts, reference_hostname, self.ssh_client.user, self.ssh_client.password)
 
         # We're done with the ssh sessions now.
-        self.ssh_client.disconnect()
+        #self.ssh_client.disconnect()
+        #self.ssh_client.close()
 
-    def open_ssh_connection(self, hostname, user=None, password=None, proxy_host=None):
-        """
-        reliably open an ssh connection to the host - does not return unless successful
-        :param hostname:
-        :return:
-        """
-        # next to add - use the ip addrs in self.beacons to ssh to, rather than name
-        ssh_client = None
-        # print(f"Trying to ssh to {hostname}")
-        for ipaddr in self.beacons[hostname]:
-            try:
-                ssh_client = SSHClient(ipaddr,
-                                       user=user,
-                                       password=password,
-                                       proxy_host=proxy_host,
-                                       num_retries=1, retry_delay=1, timeout=5.0)
-
-                return ssh_client
-            except pssh.exceptions.AuthenticationError as exc:
-                # print(f"auth error {exc}")
-                message_format, host, port, reason = exc.args
-                reason_text = reason.args[0]
-                message = message_format % (host, port, reason_text)
-                print(f"AuthenticationError: {message}")
-                break   # go ask for a user/pass
-            except pssh.exceptions.ProxyError as exc:
-                print(f"proxy error {exc}")
-                # this is essentially a retry...
-            except Exception as exc:
-                print(f"caught exception {exc.args}")
-                # not sure what to do here... try next one or ask for password
-
-        # resort to asking for a user/pass
-        while ssh_client is None:
-            # keys didn't work - ask for user/password - keep trying if they mistype it
-            print(f"Please enter credentials for {hostname}")
-            user, password = ask_for_credentials()
-            for ipaddr in self.beacons[hostname]:
-                try:
-                    ssh_client = SSHClient(ipaddr,
-                                           user=user,
-                                           password=password,
-                                           proxy_host=proxy_host,
-                                           num_retries=1, retry_delay=1, timeout=5.0)
-                    return ssh_client
-                except pssh.exceptions.AuthenticationError as exc:
-                    print(f"userid/password rejected, please try again")
-                    break   # break for loop, go get user/pass again
-                except Exception as exc:
-                    print(f"Exception: {exc.args}")
-                    continue # try next ip addr
+#    def open_ssh_connection(self, hostname, user=None, password=None, proxy_host=None):
+#        """
+#        reliably open an ssh connection to the host - does not return unless successful
+#        :param hostname:
+#        :return:
+#        """
+#        # next to add - use the ip addrs in self.beacons to ssh to, rather than name
+#        ssh_client = None
+#        # print(f"Trying to ssh to {hostname}")
+#        for ipaddr in self.beacons[hostname]:
+#            try:
+#                ssh_client = SSHClient(ipaddr,
+#                                       user=user,
+#                                       password=password,
+#                                       proxy_host=proxy_host,
+#                                       num_retries=1, retry_delay=1, timeout=5.0)
+#
+#                return ssh_client
+#            except pssh.exceptions.AuthenticationError as exc:
+#                # print(f"auth error {exc}")
+#                message_format, host, port, reason = exc.args
+#                reason_text = reason.args[0]
+#                message = message_format % (host, port, reason_text)
+#                print(f"AuthenticationError: {message}")
+#                break   # go ask for a user/pass
+#            except pssh.exceptions.ProxyError as exc:
+#                print(f"proxy error {exc}")
+#                # this is essentially a retry...
+#            except Exception as exc:
+#                print(f"caught exception {exc.args}")
+#                # not sure what to do here... try next one or ask for password
+#
+#        # resort to asking for a user/pass
+#        while ssh_client is None:
+#            # keys didn't work - ask for user/password - keep trying if they mistype it
+#            print(f"Please enter credentials for {hostname}")
+#            user, password = ask_for_credentials()
+#            for ipaddr in self.beacons[hostname]:
+#                try:
+#                    ssh_client = SSHClient(ipaddr,
+#                                           user=user,
+#                                           password=password,
+#                                           proxy_host=proxy_host,
+#                                           num_retries=1, retry_delay=1, timeout=5.0)
+#                    return ssh_client
+#                except pssh.exceptions.AuthenticationError as exc:
+#                    print(f"userid/password rejected, please try again")
+#                    break   # break for loop, go get user/pass again
+#                except Exception as exc:
+#                    print(f"Exception: {exc.args}")
+#                    continue # try next ip addr
 
     def get_gateways(self, hostlist, ref_hostname, user, password):
         clients = dict()
@@ -427,10 +435,14 @@ class WekaHostGroup():
         for host, host_obj in hostlist.items():
             # open sessions to all the hosts
             print(f"Opening ssh to {host}")
-            clients[host] = self.open_ssh_connection(host,
-                                                     user=user,
-                                                     password=password,
-                                                     proxy_host=ref_hostname)
+            clients[host] = RemoteServer(host)
+            clients[host].user = user
+            clients[host].password = password if password is not None else ""
+            clients[host].connect()
+            #clients[host] = self.open_ssh_connection(host,
+            #                                         user=user,
+            #                                         password=password,
+            #                                         proxy_host=ref_hostname)
 
             print(f"connection to {host} established")
             host_out[host] = dict()
@@ -438,13 +450,17 @@ class WekaHostGroup():
                 print(f"    Scanning {host}:{nic}")
                 # note - this is asynchronous...
                 nic_obj.gateway = None
-                host_out[host][nic_obj] = clients[host].run_command(f"ip route get 8.8.8.8 oif {nic}")
+                #host_out[host][nic_obj] = clients[host].run_command(f"ip route get 8.8.8.8 oif {nic}")
+                host_out[host][nic_obj] = clients[host].run(f"ip route get 8.8.8.8 oif {nic}")
 
         # now collect the output
         for host, host_obj in hostlist.items():
             for nic_obj, cmd_output in host_out[host].items():
-                outputlines = list(cmd_output.stdout)
+                #outputlines = list(cmd_output.stdout)
+                #outputlines = cmd_output.stdout
+                outputlines = cmd_output.stdout.split('\n')
                 if len(outputlines) > 0:
+                    #splitlines = outputlines[0].split()
                     splitlines = outputlines[0].split()
                     if splitlines[1] == 'via':  # There's a gateway!
                         nic_obj.gateway = splitlines[2]
@@ -454,9 +470,9 @@ class WekaHostGroup():
                           f" return code={cmd_output.exit_code}," +
                           f" stderr={list(cmd_output.stderr)}")
 
-        for name, client in clients.items():
-            log.debug(f"Closing ssh to {name}")
-            client.disconnect()
+#        for name, client in clients.items():
+#            log.debug(f"Closing ssh to {name}")
+#            client.disconnect()
 
 
 def scan_hosts(reference_hostname):
