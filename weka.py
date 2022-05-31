@@ -2,26 +2,17 @@
 # Weka Specific Code
 ################################################################################################
 import ipaddress
-import socket
 import sys
 from collections import OrderedDict
 from logging import getLogger
 
-log = getLogger(__name__)
-
-from wekapyutils.wekassh import RemoteServer, parallel, pdsh
-
-#try:
-#    from pssh.clients import SSHClient, ParallelSSHClient
-#except ImportError:
-#    from pssh.clients.ssh import SSHClient, ParallelSSHClient
-#
-#import pssh.exceptions
-
-import getpass
+from wekapyutils.wekassh import RemoteServer, parallel
 
 from wekalib.exceptions import LoginError, CommunicationError, NewConnectionError
 from wekalib.wekaapi import WekaApi
+from wekapyutils.sthreads import threaded, default_threader
+
+log = getLogger(__name__)
 
 
 class WekaInterface(ipaddress.IPv4Interface):
@@ -34,19 +25,35 @@ class WekaInterface(ipaddress.IPv4Interface):
 
 
 class STEMHost(object):
-    def __init__(self, name, info_hw):
+    def __init__(self, name):
         self.name = name
-        self.num_cores = len(info_hw['cores'])
-        self.cpu_model = info_hw['cores'][0]['model']
+        self.host_api = None
+        self.machine_info = None
+
+    def get_machine_info(self):
+        """
+        get the info_hw output from the API
+        """
+        try:
+            self.machine_info = self.host_api.weka_api_command("machine_query_info", parms={})
+        except LoginError:
+            print(f"host {self.name} failed login querying info")
+            errors = True
+        except CommunicationError:
+            print(f"Error communicating with host {self.name} querying info")
+            errors = True
+
+        self.num_cores = len(self.machine_info['cores'])
+        self.cpu_model = self.machine_info['cores'][0]['model']
         self.drives = dict()
         self.drive_devs = dict()
         self.nics = dict()
-        self.version = info_hw['version']
-        self.info_hw = info_hw  # save a copy in case we need it
+        self.version = self.machine_info['version']
+        #self.info_hw = info_hw  # save a copy in case we need it
         self.dataplane_nics = dict()
-        self.total_ramGB = self.info_hw["memory"]["total"] / 1024 / 1024 / 1024
+        self.total_ramGB = self.machine_info["memory"]["total"] / 1024 / 1024 / 1024
 
-        for drive in info_hw['disks']:
+        for drive in self.machine_info['disks']:
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
                     len(drive['pciAddr']) > 0 and drive['type'] == 'DISK':
                 # not drive['isSwap'] and \     # pukes now; no longer there in 3.13
@@ -59,12 +66,12 @@ class STEMHost(object):
         #                 "isMounted": true,
 
         # remove any drives with mounted partitions from the list
-        for drive in info_hw['disks']:
+        for drive in self.machine_info['disks']:
             if drive['type'] == "PARTITION" and drive['parentName'] in self.drives and drive['isMounted']:
                 # if drive['isSwap'] or drive['isMounted']:
                 del self.drives[drive['parentName']]
 
-        for net_adapter in info_hw['net']['interfaces']:
+        for net_adapter in self.machine_info['net']['interfaces']:
             if (4000 < net_adapter['mtu'] < 10000) and len(net_adapter['ip4']) > 0:
                 # if details['ethBondingMaster'] != '':  # what are the other values?
                 #    print(f"{name}:{net_adapter['name']}:ethBondingMaster = {details['ethBondingMaster']}")
@@ -77,7 +84,7 @@ class STEMHost(object):
                     continue  # skip slaves
 
                 if len(net_adapter['name_slaves']) != 0:  # what are other values?
-                    print(f"{name}:{net_adapter['name']}:name_slaves = {net_adapter['name_slaves']}")
+                    print(f"{self.name}:{net_adapter['name']}:name_slaves = {net_adapter['name_slaves']}")
                     pass
                 if details['validationCode'] == "OK" and details['linkDetected']:
                     self.nics[net_adapter['name']] = \
@@ -88,13 +95,13 @@ class STEMHost(object):
                                       details['speedMbps'])
 
     def find_interface_details(self, iface):
-        for eth in self.info_hw['eths']:
+        for eth in self.machine_info['eths']:
             if eth['interface_alias'] == iface:
                 return eth
         return None
 
     def find_bond_details(self, iface):
-        for eth in self.info_hw['eths']:
+        for eth in self.machine_info['eths']:
             if eth['ethBondingMaster'] == iface:
                 return eth
         return None
@@ -103,122 +110,44 @@ class STEMHost(object):
         return self.name
 
 
-def resolve_hostname(hostname):
-    try:
-        socket.gethostbyname(hostname)
-    except socket.gaierror:
-        return False
-    except Exception:
-        raise
-    return True
+    def open_api(self, ip_list=None):
+        """
+        Try to open a connection to the API on the host; try all listed IPs, take first one that works
+        depending on how we're running, we may or may not be able to talk to the host over every ip...
 
+        :param ip_list: a list of ip addrs
+        :return: weka api object
+        """
+        if ip_list is None:
+            ip_list = [self.name]
 
-def beacon_hosts(hostname):
-    """
-    :param hostname: str
-    :return: a dict of hostname:[list of ip addrs]
-    """
-    # start with the hostname given; get a list of beacons from it
-    print("finding hosts...")
-    api = open_api(hostname)
-    if api is None:
-        print(f"ERROR: Unable to contact host '{hostname}'")
-        sys.exit(1)  # very hard error
+        log.debug(f"host {self.name}: {ip_list}")
+        for ip in ip_list:
+            try:
+                log.debug(f"{self.name}: trying on {ip}")
+                self.host_api = WekaApi(ip, scheme="http", verify_cert=False, timeout=5)
+                break
+            except LoginError:
+                log.debug(f"host {self.name} failed login on ip {ip}?")
+                continue
+            except CommunicationError as exc:
+                log.debug(f"Error opening API for host {self.name} on ip {ip}: {exc}")
+                continue
+            except NewConnectionError as exc:
+                log.error(f"Unable to contact host {self.name} - is weka installed there?")
+                continue
+            except Exception as exc:
+                log.error(f"Other exception on host {self.name}: {exc}")
+                continue
 
-    if not api.STEMMode:
-        print(f"host {hostname} is already part of a cluster")
-        sys.exit(1)
-
-    # returns a dict of {ipaddr:hostname}
-    beacons = api.weka_api_command("cluster_list_beacons", parms={})
-
-    # make a dict of {hostname:[ipaddr]}
-    stem_beacons = dict()
-    for ip, hostname in beacons.items():
-        if hostname not in stem_beacons:
-            stem_beacons[hostname] = [ip]
+        if self.host_api is None:
+            log.debug(f"{self.name}: unable to open api to {self.name}")
+            return None
         else:
-            stem_beacons[hostname].append(ip)
-
-    for host, ips in stem_beacons.items():
-        print(f"{host}: {sorted(ips)}")
-
-    return OrderedDict(sorted(stem_beacons.items()))
-
-
-def open_api(host, ip_list=None):
-    """
-    Try to open a connection to the API on the host; try all listed IPs, take first one that works
-    depending on how we're running, we may or may not be able to talk to the host over every ip...
-
-    :param ip_list: a list of ip addrs
-    :return: weka api object
-    """
-    if ip_list is None:
-        ip_list = [host]
-
-    host_api = None
-    log.debug(f"host {host}: {ip_list}")
-    for ip in ip_list:
-        try:
-            log.debug(f"{host}: trying on {ip}")
-            host_api = WekaApi(ip, scheme="http", verify_cert=False, timeout=5)
-            break
-        except LoginError:
-            log.debug(f"host {host} failed login on ip {ip}?")
-            continue
-        except CommunicationError as exc:
-            log.debug(f"Error opening API for host {host} on ip {ip}: {exc}")
-            continue
-        except NewConnectionError as exc:
-            log.error(f"Unable to contact host {host} - is weka installed there?")
-            continue
-        except Exception as exc:
-            log.error(f"Other exception on host {host}: {exc}")
-            continue
-
-    if host_api is None:
-        log.debug(f"{host}: unable to open api to {host}")
-        return None
-    else:
-        log.debug(f"host api opened on {host} via {ip}")
-        return host_api
-
-
-def get_machine_info(host, host_api):
-    """
-    get the info_hw output from the API
-    :param host: hostname
-    :param host_api: weka api object
-    :return: info_hw output
-    """
-    machine_info = None
-    try:
-        machine_info = host_api.weka_api_command("machine_query_info", parms={})
-    except LoginError:
-        print(f"host {host} failed login querying info")
-        errors = True
-    except CommunicationError:
-        print(f"Error communicating with host {host} querying info")
-        errors = True
-
-    return machine_info
-
-
-#def ask_for_credentials():
-#    actual_user = getpass.getuser()
-#    print(f"Username({actual_user}): ", end='')
-#    user = input()
-#    if len(user) == 0:
-#        user = actual_user
-#
-#    password = getpass.getpass()
-#    print()
-#    return (user, password)
+            log.debug(f"host api opened on {self.name} via {ip}")
 
 
 dataplane_hostsfile = dict()
-
 
 
 class WekaHostGroup():
@@ -248,20 +177,22 @@ class WekaHostGroup():
         # cycle through the beacon hosts, and fetch their HW info, create STEMHosts
         print(f"Getting configuration info from hosts...")
         for host, ip_list in self.beacons.items():
-            host_api = open_api(host, ip_list)
+            # if we're going to do this, we have to create the STEMHost object first, not below
+            candidate = STEMHost(host)
+            candidate.open_api(ip_list)
 
-            if host_api is None:
+            if candidate.host_api is None:
                 print(f"Unable to communicate with {host} - skipping")
                 errors = True
                 continue  # nope, so move on to next host
 
-            machine_info = get_machine_info(host, host_api)
-            if machine_info is None:
+            candidate.get_machine_info()
+            if candidate.machine_info is None:
                 errors = True
                 continue  # skip it if unable to get the info
 
-            print(f"    Host {host} is a STEM-mode instance running release {machine_info['version']}")
-            candidates[host] = STEMHost(host, machine_info)
+            print(f"    Host {host} is a STEM-mode instance running release {candidate.machine_info['version']}")
+            candidates[host] = candidate
 
         if errors:
             print("Errors communicating (api) with some hosts.")
@@ -286,7 +217,7 @@ class WekaHostGroup():
         del candidates
 
         print("Preparing to explore network...")
-        #self.ssh_client = self.open_ssh_connection(self.reference_hostname)  # open an ssh to the reference host
+        # self.ssh_client = self.open_ssh_connection(self.reference_hostname)  # open an ssh to the reference host
         self.ssh_client = RemoteServer(self.reference_hostname)
         self.ssh_client.connect()
 
@@ -316,10 +247,7 @@ class WekaHostGroup():
                         self.pingable_ips[source_interface].append(
                             targetip)  # should only add the ip on the source interface?
                         continue  # not sure why, but ping fails on loopback anyway
-                    #ssh_out = self.ssh_client.run_command(f"ping -c1 -W1 -I {source_interface} {targetip.ip}")
                     ssh_out = self.ssh_client.run(f"ping -c1 -W1 -I {source_interface} {targetip.ip}")
-                    #junk = list(ssh_out.stdout)  # gather output so we can get return code
-                    #if ssh_out.exit_code == 0:
                     if ssh_out.status == 0:
                         # we were able to ping the host!  add it to the set of hosts we can access via this IF
                         self.accessible_hosts[source_interface].add(hostobj.name)
@@ -373,60 +301,7 @@ class WekaHostGroup():
         self.get_gateways(self.usable_hosts, reference_hostname, self.ssh_client.user, self.ssh_client.password)
 
         # We're done with the ssh sessions now.
-        #self.ssh_client.disconnect()
-        #self.ssh_client.close()
-
-#    def open_ssh_connection(self, hostname, user=None, password=None, proxy_host=None):
-#        """
-#        reliably open an ssh connection to the host - does not return unless successful
-#        :param hostname:
-#        :return:
-#        """
-#        # next to add - use the ip addrs in self.beacons to ssh to, rather than name
-#        ssh_client = None
-#        # print(f"Trying to ssh to {hostname}")
-#        for ipaddr in self.beacons[hostname]:
-#            try:
-#                ssh_client = SSHClient(ipaddr,
-#                                       user=user,
-#                                       password=password,
-#                                       proxy_host=proxy_host,
-#                                       num_retries=1, retry_delay=1, timeout=5.0)
-#
-#                return ssh_client
-#            except pssh.exceptions.AuthenticationError as exc:
-#                # print(f"auth error {exc}")
-#                message_format, host, port, reason = exc.args
-#                reason_text = reason.args[0]
-#                message = message_format % (host, port, reason_text)
-#                print(f"AuthenticationError: {message}")
-#                break   # go ask for a user/pass
-#            except pssh.exceptions.ProxyError as exc:
-#                print(f"proxy error {exc}")
-#                # this is essentially a retry...
-#            except Exception as exc:
-#                print(f"caught exception {exc.args}")
-#                # not sure what to do here... try next one or ask for password
-#
-#        # resort to asking for a user/pass
-#        while ssh_client is None:
-#            # keys didn't work - ask for user/password - keep trying if they mistype it
-#            print(f"Please enter credentials for {hostname}")
-#            user, password = ask_for_credentials()
-#            for ipaddr in self.beacons[hostname]:
-#                try:
-#                    ssh_client = SSHClient(ipaddr,
-#                                           user=user,
-#                                           password=password,
-#                                           proxy_host=proxy_host,
-#                                           num_retries=1, retry_delay=1, timeout=5.0)
-#                    return ssh_client
-#                except pssh.exceptions.AuthenticationError as exc:
-#                    print(f"userid/password rejected, please try again")
-#                    break   # break for loop, go get user/pass again
-#                except Exception as exc:
-#                    print(f"Exception: {exc.args}")
-#                    continue # try next ip addr
+        # self.ssh_client.disconnect()
 
     def get_gateways(self, hostlist, ref_hostname, user, password):
         clients = dict()
@@ -434,54 +309,81 @@ class WekaHostGroup():
         print("Searching for gateways...")
         for host, host_obj in hostlist.items():
             # open sessions to all the hosts
-            print(f"Opening ssh to {host}")
+            #print(f"Opening ssh to {host}")
             clients[host] = RemoteServer(host)
             clients[host].user = user
             clients[host].password = password if password is not None else ""
-            clients[host].connect()
-            #clients[host] = self.open_ssh_connection(host,
-            #                                         user=user,
-            #                                         password=password,
-            #                                         proxy_host=ref_hostname)
 
+        print(f"Opening ssh to hosts")
+        parallel(clients.values(), RemoteServer.connect)
+
+        for host, host_obj in hostlist.items():
             print(f"connection to {host} established")
             host_out[host] = dict()
             for nic, nic_obj in host_obj.nics.items():
                 print(f"    Scanning {host}:{nic}")
                 # note - this is asynchronous...
                 nic_obj.gateway = None
-                #host_out[host][nic_obj] = clients[host].run_command(f"ip route get 8.8.8.8 oif {nic}")
                 host_out[host][nic_obj] = clients[host].run(f"ip route get 8.8.8.8 oif {nic}")
 
         # now collect the output
         for host, host_obj in hostlist.items():
             for nic_obj, cmd_output in host_out[host].items():
-                #outputlines = list(cmd_output.stdout)
-                #outputlines = cmd_output.stdout
                 outputlines = cmd_output.stdout.split('\n')
                 if len(outputlines) > 0:
-                    #splitlines = outputlines[0].split()
                     splitlines = outputlines[0].split()
                     if splitlines[1] == 'via':  # There's a gateway!
                         nic_obj.gateway = splitlines[2]
                         print(f"    Host {host}:{nic_obj.name} has gateway {nic_obj.gateway}")
                 else:
-                    print(f"Error executing 'ip route get' on {host}:{nic_obj.name}:"+
+                    print(f"Error executing 'ip route get' on {host}:{nic_obj.name}:" +
                           f" return code={cmd_output.exit_code}," +
                           f" stderr={list(cmd_output.stderr)}")
+
 
 #        for name, client in clients.items():
 #            log.debug(f"Closing ssh to {name}")
 #            client.disconnect()
+def beacon_hosts(hostname):
+    """
+    :param hostname: str
+    :return: a dict of hostname:[list of ip addrs]
+    """
+    # start with the hostname given; get a list of beacons from it
+    print("finding hosts...")
+    reference_host = STEMHost(hostname)
+    reference_host.open_api([hostname])
+    if reference_host.host_api is None:
+        print(f"ERROR: Unable to contact host '{hostname}'")
+        sys.exit(1)  # very hard error
+
+    if not reference_host.host_api.STEMMode:
+        print(f"host {hostname} is already part of a cluster")
+        sys.exit(1)
+
+    # returns a dict of {ipaddr:hostname}
+    beacons = reference_host.host_api.weka_api_command("cluster_list_beacons", parms={})
+
+    # make a dict of {hostname:[ipaddr]}
+    stem_beacons = dict()
+    for ip, hostname in beacons.items():
+        if hostname not in stem_beacons:
+            stem_beacons[hostname] = [ip]
+        else:
+            stem_beacons[hostname].append(ip)
+
+    for host, ips in stem_beacons.items():
+        print(f"{host}: {sorted(ips)}")
+
+    return OrderedDict(sorted(stem_beacons.items()))
 
 
 def scan_hosts(reference_hostname):
     """
     scan for STEM-mode Weka hosts
-    :param hostname: str
+    :param reference_hostname: str
     :return: a dict containing the valid STEMHost objects
     """
     stem_beacons = beacon_hosts(reference_hostname)
-    # valid_hosts = find_valid_hosts(reference_hostname, stem_beacons)
     hostgroup = WekaHostGroup(reference_hostname, stem_beacons)
     return hostgroup
