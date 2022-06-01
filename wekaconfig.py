@@ -27,7 +27,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.version:
-        print(f"{args.prog} version 1.0.1")
+        print(f"{args.prog} version 1.1.0")
         sys.exit(0)
 
     register_module("paramiko", logging.ERROR)
