@@ -57,7 +57,7 @@ class WekaCluster(object):
                     if nic in iplist:
                         this_hosts_ifs.add(nic)
 
-            for nic in list(this_hosts_ifs):
+            for nic in sorted(list(this_hosts_ifs)):
                 if nic.gateway is not None:
                     gateway = f"--gateway={nic.gateway}"
                 else:
