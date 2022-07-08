@@ -355,7 +355,11 @@ class WekaHostGroup():
 
     def get_gateways(self, host, nic):
         log.info(f"probing gateway for {host}/{nic.name}")
-        for target in self.pingable_ips[nic.name]:
+        # determine which nic.name on the reference host we're going to look at... ie: which network
+        for ref_nic in self.referencehost_obj.nics.values():
+            if nic.network == ref_nic.network:
+                target_interface = ref_nic.name
+        for target in self.pingable_ips[target_interface]:
             cmd_output = host.ssh_client.run(f"ip route get {target} oif {nic.name}")
 
             outputlines = cmd_output.stdout.split('\n')
