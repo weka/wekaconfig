@@ -85,6 +85,27 @@ class STEMHost(object):
                 if len(net_adapter['name_slaves']) != 0:  # what are other values?
                     print(f"{self.name}:{net_adapter['name']}:name_slaves = {net_adapter['name_slaves']}")
                     pass
+
+                # make sure we were able to get the details we need
+                if details is None:
+                    log.error(f"no details available for {net_adapter['name']} on host '{self.name}' - skipping")
+                    continue
+
+                # check this way so it doesn't puke
+                val_code = details.get('validationCode', None)
+                link = details.get('linkDetected', None)
+                speed = details.get('speedMbps', None)
+
+                if val_code is None:
+                    log.error(f"val_code is None for {net_adapter['name']} on host '{self.name}' - skipping")
+                    continue
+                if link is None:
+                    log.error(f"link is None for {net_adapter['name']} on host '{self.name}' - skipping")
+                    continue
+                if speed is None:
+                    log.error(f"speed is None for {net_adapter['name']} on host '{self.name}' - skipping")
+                    continue
+
                 if details['validationCode'] == "OK" and details['linkDetected']:
                     self.nics[net_adapter['name']] = \
                         WekaInterface(net_adapter['linkLayer'],
@@ -162,7 +183,7 @@ class WekaHostGroup():
         :param beacons: dict of hostname:[list of ip addrs]
         :return: a list of STEMHost objects
         """
-        default_threader.num_simultaneous = 10  # ssh has a default limit of 10 sessions at a time
+        default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
         self.beacons = beacons
         if reference_hostname == "localhost":
             import platform
@@ -179,7 +200,7 @@ class WekaHostGroup():
             # if we're going to do this, we have to create the STEMHost object first, not below
             candidate = STEMHost(host)
             # print(f"Opening API to {host}")
-            log.debug(f"opening api to {host}")
+            log.info(f"opening api to {host}")
             threaded_method(candidate, STEMHost.open_api, ip_list)  # schedule to run (they're slow)
             candidates[host] = candidate
             # candidate.open_api(ip_list)
@@ -333,20 +354,26 @@ class WekaHostGroup():
             log.debug(f"From {source_interface} target {hostname}-{targetip} failed.")
 
     def get_gateways(self, host, nic):
-        log.debug(f"getting gateway for {host}/{nic.name}")
-        cmd_output = host.ssh_client.run(f"ip route get 8.8.8.8 oif {nic.name}")
+        log.info(f"probing gateway for {host}/{nic.name}")
+        # determine which nic.name on the reference host we're going to look at... ie: which network
+        for ref_nic in self.referencehost_obj.nics.values():
+            if nic.network == ref_nic.network:
+                target_interface = ref_nic.name
+        for target in self.pingable_ips[target_interface]:
+            cmd_output = host.ssh_client.run(f"ip route get {target} oif {nic.name}")
 
-        outputlines = cmd_output.stdout.split('\n')
-        if len(outputlines) > 0:
-            log.debug(f"got output for {host}/{nic.name}")
-            splitlines = outputlines[0].split()
-            if splitlines[1] == 'via':  # There's a gateway!
-                nic.gateway = splitlines[2]
-                print(f"    Host {host}:{nic.name} has gateway {nic.gateway}")
-        else:
-            log.error(f"Error executing 'ip route get' on {host}:{nic.name}:" +
-                      f" return code={cmd_output.exit_code}," +
-                      f" stderr={list(cmd_output.stderr)}")
+            outputlines = cmd_output.stdout.split('\n')
+            if len(outputlines) > 0:
+                log.debug(f"got output for {host}/{nic.name}")
+                splitlines = outputlines[0].split()
+                if splitlines[1] == 'via':  # There's a gateway!
+                    nic.gateway = splitlines[2]
+                    print(f"    Host {host}:{nic.name} has gateway {nic.gateway}")
+                    break
+            else:
+                log.error(f"Error executing 'ip route get' on {host}:{nic.name}:" +
+                          f" return code={cmd_output.exit_code}," +
+                          f" stderr={list(cmd_output.stderr)}")
 
     def open_ssh_toall(self):
         self.clients = dict()

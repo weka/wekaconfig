@@ -37,6 +37,7 @@ if __name__ == '__main__':
     register_module("forms", DEFAULT)
     register_module("wekalib", logging.ERROR)
     register_module("urllib3", logging.ERROR)
+    register_module("wekapyutils.wekassh", logging.ERROR)
     configure_logging(log, args.verbosity)
 
     try:
@@ -57,6 +58,9 @@ if __name__ == '__main__':
     host_list = scan_hosts(args.host)
 
     # pause here so the user can review what's happened before we go to full-screen mode
+    if len(host_list.referencehost_obj.nics) < 1:
+        log.critical(f"There are no usable networks, aborting.")
+        sys.exit(1)
     print(f"Scanning Complete.  Press Enter to continue: ", end='')
     user = input()
 
