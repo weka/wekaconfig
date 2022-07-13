@@ -56,7 +56,8 @@ class STEMHost(object):
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
                     len(drive['pciAddr']) > 0 and drive['type'] == 'DISK':
                 # not drive['isSwap'] and \     # pukes now; no longer there in 3.13
-                self.drives[drive['devName']] = drive['devPath']
+                #self.drives[drive['devName']] = drive['devPath']
+                self.drives[drive['devName']] = drive
 
         # need to determine if any of the above drives are actually in use - boot devices, root drives, etc.
         # how?
@@ -385,10 +386,70 @@ class WekaHostGroup():
             host_obj.ssh_client = self.clients[host]
         parallel(self.clients.values(), RemoteServer.connect)
 
+    def is_homogeneous(self):
+        """
+        # check if all the hosts are the same.  Note ones that are different.
+        :return:
+        """
 
-#        for name, client in clients.items():
-#            log.debug(f"Closing ssh to {name}")
-#            client.disconnect()
+        cores = dict()  # dict of {numcores: [hosts]}
+        ram = dict()  # dict of {ram_GB: [hosts]}
+        drives = dict()  # dict of {num_drives: [hosts]}
+        drive_sizes = dict()
+        homo = True
+
+        # loop through, make notes
+        for host, host_obj in self.usable_hosts.items():
+            # check cores
+            corehostlist = cores.get(host_obj.num_cores, list())
+            corehostlist.append(host)
+            cores[host_obj.num_cores] = corehostlist
+
+            # check RAM
+            ramhostlist = ram.get(int(host_obj.total_ramGB), list())
+            ramhostlist.append(host)
+            ram[int(host_obj.total_ramGB)] = ramhostlist
+
+            # check # of drives - {numdrives: [list of host objects]}
+            drivehostlist = drives.get(len(host_obj.drives), list())
+            drivehostlist.append(host_obj)
+            drives[len(host_obj.drives)] = drivehostlist
+
+            #these_drives = drive_sizes.get(host_obj.drives, list())   # returns list of drives
+            # find the host_obj.machine_info.disks entry (its a list) where dev_path == these_drives
+            for drive in host_obj.drives.values():
+                drive_size_hostlist = drive_sizes.get(drive['sizeBytes'], list())
+                if host not in drive_size_hostlist:
+                    drive_size_hostlist.append(host)
+                drive_sizes[drive['sizeBytes']] = drive_size_hostlist
+
+
+        if len(cores) != 1:
+            homo = False
+            log.info("Hosts do not have a homogeneous number of cores")
+            for corecount, corehostlist in sorted(cores.items()):
+                log.info(f"  There are {len(corehostlist)} hosts with {corecount} cores: {corehostlist}")
+
+        if len(ram) != 1:
+            homo = False
+            log.info("Hosts do not have a homogeneous amount of ram")
+            for ram_GB, ramhostlist in sorted(ram.items()):
+                log.info(f"  There are {len(ramhostlist)} hosts with {ram_GB} GB of RAM: {ramhostlist}")
+
+        if len(drives) != 1:
+            homo = False
+            log.info("Hosts do not have a homogeneous number of drives")
+            for num_drives, drivehostlist in sorted(drives.items()):
+                log.info(f"  There are {len(drivehostlist)} hosts with {num_drives} GB of RAM: {drivehostlist}")
+
+        if len(drive_sizes) != 1:
+            homo = False
+            log.info("Hosts do not have a homogeneous drive sizes")
+            for drive_size, drivehostlist in sorted(drive_sizes.items()):
+                log.info(f"  There are {len(drivehostlist)} hosts with {int(drive_size/1000/1000/1000)} GB size drives: {drivehostlist}")
+
+        return homo
+
 def beacon_hosts(hostname):
     """
     :param hostname: str
@@ -431,4 +492,8 @@ def scan_hosts(reference_hostname):
     """
     stem_beacons = beacon_hosts(reference_hostname)
     hostgroup = WekaHostGroup(reference_hostname, stem_beacons)
+    if not hostgroup.is_homogeneous():
+        log.info("Host group is not Homogeneous!  Please verify configuration(s)")
+    else:
+        log.info("Host group is Homogeneous.")
     return hostgroup
