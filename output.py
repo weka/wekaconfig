@@ -73,8 +73,8 @@ class WekaCluster(object):
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
             thishost = base + str(host.host_id) + ' '
-            for drive in sorted(host.drives.values()):
-                thishost += drive + ' '
+            for drivename, drive in sorted(host.drives.items()):
+                thishost += drive['devPath'] + ' '
             # thishost += '--force'  # don't force it - can overwrite boot drives!
             result.append(thishost)
             # host_id += 1
