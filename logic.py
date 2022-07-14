@@ -7,11 +7,11 @@ log = getLogger(__name__)
 
 
 class Cores():
-    def __init__(self, total_cores, num_drives):
+    def __init__(self, total_cores, num_drives, MBC):
         # set default values on init
         self.total = total_cores
         self.usable = total_cores - 5
-        if self.usable > 19:
+        if self.usable > 19 and not MBC:
             self.usable = 19
         self.fe = 2
         self.drives = num_drives

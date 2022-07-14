@@ -52,6 +52,11 @@ class WekaConfigApp(wekatui.NPSAppManaged):
         self.dedicated = None
         self.auto_failure_domain = None
         self.cloud_enable = None
+        self.weka_ver = hostgroup.referencehost_obj.version.split('.')
+        if int(self.weka_ver[0]) < 4:
+            self.MBC = False
+        else:
+            self.MBC = True
 
         log.info("starting UI...")
 

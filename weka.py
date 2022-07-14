@@ -24,6 +24,7 @@ class WekaInterface(ipaddress.IPv4Interface):
 
 
 class STEMHost(object):
+    # uses ONLY the API...
     def __init__(self, name):
         self.name = name
         self.host_api = None
@@ -331,7 +332,7 @@ class WekaHostGroup():
         print(f"Opening ssh to hosts")
         self.open_ssh_toall()
 
-        default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
+        #default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
         self.host_out = dict()
         print("Probing for gateways")
         for host, host_obj in self.usable_hosts.items():
@@ -340,6 +341,7 @@ class WekaHostGroup():
                 self.get_gateways(host_obj, nic_obj)
         # parallel(self, WekaHostGroup.get_gateways)
         # default_threader.run()
+        self.get_hostinfo()
 
     def ping_clients(self, source_interface, hostobj, targetip):
         hostname = hostobj.name
@@ -393,6 +395,7 @@ class WekaHostGroup():
         """
 
         cores = dict()  # dict of {numcores: [hosts]}
+        hyperthreads = dict()
         ram = dict()  # dict of {ram_GB: [hosts]}
         drives = dict()  # dict of {num_drives: [hosts]}
         drive_sizes = dict()
@@ -404,6 +407,10 @@ class WekaHostGroup():
             corehostlist = cores.get(host_obj.num_cores, list())
             corehostlist.append(host)
             cores[host_obj.num_cores] = corehostlist
+
+            hyperthreadlist = hyperthreads.get(host_obj.hyperthread, list())
+            hyperthreadlist.append(host)
+            hyperthreads[host_obj.hyperthread] = hyperthreadlist
 
             # check RAM
             ramhostlist = ram.get(int(host_obj.total_ramGB), list())
@@ -430,6 +437,11 @@ class WekaHostGroup():
             for corecount, corehostlist in sorted(cores.items()):
                 log.info(f"  There are {len(corehostlist)} hosts with {corecount} cores: {corehostlist}")
 
+        if len(hyperthreads) != 1:
+            log.info("Not all hosts share hyperthread/SMT setting")
+            for value, hostlist in hyperthreads.items():
+                log.info(f"  There are {len(hostlist)} hosts with Hyperthreading/SMT {value}: {hostlist}")
+
         if len(ram) != 1:
             homo = False
             log.info("Hosts do not have a homogeneous amount of ram")
@@ -452,6 +464,40 @@ class WekaHostGroup():
                          f"drives: {drivehostlist}")
 
         return homo
+
+    def get_hostinfo(self):
+        """
+        # get info on the hosts
+        :return:
+        """
+        for host, host_obj in self.usable_hosts.items():
+            threaded_method(self, WekaHostGroup.lscpu, host_obj)
+
+        default_threader.run()
+
+        for host, host_obj in self.usable_hosts.items():
+            threads = host_obj.lscpu_data.get('Thread(s) per core', '')
+            host_obj.hyperthread = False if threads == '1' else True
+            host_obj.threads_per_core = int(threads)
+            log.debug(f"{host} hyperthreading/SMT is {host_obj.hyperthread}")
+
+        pass
+
+    def lscpu(self, hostobj):
+        hostobj.lscpu_data = dict()
+        cmd_output = self.ssh_client.run("lscpu")
+        if cmd_output.status == 0:
+            # we were able to run lscpu
+            outputlines = cmd_output.stdout.split('\n')
+            if len(outputlines) > 0:
+                log.debug(f"got lscpu output for {hostobj.name}")
+                for line in outputlines:
+                    splitlines = line.split(':')
+                    if len(splitlines) > 1:
+                        hostobj.lscpu_data[splitlines[0]] = splitlines[1].strip()
+
+        else:
+            log.error(f"lscpu failed on {hostobj.name}")
 
 def beacon_hosts(hostname):
     """
