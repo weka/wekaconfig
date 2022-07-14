@@ -446,7 +446,10 @@ class WekaHostGroup():
             homo = False
             log.info("Hosts do not have a homogeneous drive sizes")
             for drive_size, drivehostlist in sorted(drive_sizes.items()):
-                log.info(f"  There are {len(drivehostlist)} hosts with {int(drive_size/1000/1000/1000)} GB size drives: {drivehostlist}")
+                log.info(f"  There are {len(drivehostlist)} hosts with " +
+                         f"{round(drive_size/1000/1000/1000/1000, 2)} TB/" +
+                         f"{round(drive_size/1024/1024/1024/1024, 2)} TiB " +
+                         f"drives: {drivehostlist}")
 
         return homo
 
