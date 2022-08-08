@@ -9,10 +9,9 @@ import sys
 from apps import WekaConfigApp
 from output import WekaCluster
 from weka import scan_hosts
-#from wekalogging import configure_logging
+# from wekalogging import configure_logging
 
 from wekapyutils.wekalogging import configure_logging, register_module, DEFAULT
-
 
 # get root logger
 log = logging.getLogger()
@@ -47,11 +46,12 @@ if __name__ == '__main__':
 
     # hack for broken definition of xterm-256color
     if os.environ["TERM"] == "xterm-256color":
-        os.environ["TERMINFO"] = f"{wd}/terminfo"   # we carry our own definition
+        os.environ["TERMINFO"] = f"{wd}/terminfo"  # we carry our own definition
         print(f"Setting TERMINFO to {os.environ['TERMINFO']}")
 
     if args.host == "localhost":
         import platform
+
         args.host = platform.node()
     print(f"target host is {args.host}")
     print(f"collecting host data... please wait...")

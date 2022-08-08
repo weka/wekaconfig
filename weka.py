@@ -57,7 +57,7 @@ class STEMHost(object):
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
                     len(drive['pciAddr']) > 0 and drive['type'] == 'DISK':
                 # not drive['isSwap'] and \     # pukes now; no longer there in 3.13
-                #self.drives[drive['devName']] = drive['devPath']
+                # self.drives[drive['devName']] = drive['devPath']
                 self.drives[drive['devName']] = drive
 
         # need to determine if any of the above drives are actually in use - boot devices, root drives, etc.
@@ -281,8 +281,7 @@ class WekaHostGroup():
             for source_interface in self.referencehost_obj.nics.keys():
                 for targetif, targetip in hostobj.nics.items():
                     if hostname == reference_hostname and source_interface == targetif:
-                        self.pingable_ips[source_interface].append(
-                            targetip)  # should only add the ip on the source interface?
+                        self.pingable_ips[source_interface].append(targetip)
                         continue  # not sure why, but ping fails on loopback anyway
 
                     threaded_method(self, WekaHostGroup.ping_clients, source_interface, hostobj, targetip)
@@ -332,7 +331,7 @@ class WekaHostGroup():
         print(f"Opening ssh to hosts")
         self.open_ssh_toall()
 
-        #default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
+        # default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
         self.host_out = dict()
         print("Probing for gateways")
         for host, host_obj in self.usable_hosts.items():
@@ -422,14 +421,13 @@ class WekaHostGroup():
             drivehostlist.append(host_obj)
             drives[len(host_obj.drives)] = drivehostlist
 
-            #these_drives = drive_sizes.get(host_obj.drives, list())   # returns list of drives
+            # these_drives = drive_sizes.get(host_obj.drives, list())   # returns list of drives
             # find the host_obj.machine_info.disks entry (its a list) where dev_path == these_drives
             for drive in host_obj.drives.values():
                 drive_size_hostlist = drive_sizes.get(drive['sizeBytes'], list())
                 if host not in drive_size_hostlist:
                     drive_size_hostlist.append(host)
                 drive_sizes[drive['sizeBytes']] = drive_size_hostlist
-
 
         if len(cores) != 1:
             homo = False
@@ -459,8 +457,8 @@ class WekaHostGroup():
             log.info("Hosts do not have a homogeneous drive sizes")
             for drive_size, drivehostlist in sorted(drive_sizes.items()):
                 log.info(f"  There are {len(drivehostlist)} hosts with " +
-                         f"{round(drive_size/1000/1000/1000/1000, 2)} TB/" +
-                         f"{round(drive_size/1024/1024/1024/1024, 2)} TiB " +
+                         f"{round(drive_size / 1000 / 1000 / 1000 / 1000, 2)} TB/" +
+                         f"{round(drive_size / 1024 / 1024 / 1024 / 1024, 2)} TiB " +
                          f"drives: {drivehostlist}")
 
         return homo
@@ -498,6 +496,7 @@ class WekaHostGroup():
 
         else:
             log.error(f"lscpu failed on {hostobj.name}")
+
 
 def beacon_hosts(hostname):
     """
