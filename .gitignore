@@ -1,0 +1,5 @@
+.wekaconfig.py.swp
+venv/*
+venv/**
+__pychache__/**
+__pycache__/*
