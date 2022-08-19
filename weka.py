@@ -72,7 +72,9 @@ class STEMHost(object):
                 del self.drives[drive['parentName']]
 
         for net_adapter in self.machine_info['net']['interfaces']:
-            if (4000 < net_adapter['mtu'] < 10000) and len(net_adapter['ip4']) > 0:
+            # (bruce) change lowest allowed mtu to 1400 - we technically support 2k on ib
+            # and in theory support 1500 on eth, so don't abort without options for low MTUs
+            if (1400 < net_adapter['mtu'] < 10000) and len(net_adapter['ip4']) > 0:
                 # if details['ethBondingMaster'] != '':  # what are the other values?
                 #    print(f"{name}:{net_adapter['name']}:ethBondingMaster = {details['ethBondingMaster']}")
                 #    pass
@@ -106,6 +108,9 @@ class STEMHost(object):
                 if speed is None:
                     log.error(f"speed is None for {net_adapter['name']} on host '{self.name}' - skipping")
                     continue
+                if net_adapter['mtu'] < 4000 and speed > 10000:
+                    msg = f"Host {self.name}: Net adapter {net_adapter['name']} has low mtu ({net_adapter['mtu']}). Not recommended, but continuing..."
+                    print(f"* WARNING: {msg}")
 
                 if details['validationCode'] == "OK" and details['linkDetected']:
                     self.nics[net_adapter['name']] = \
@@ -365,7 +370,7 @@ class WekaHostGroup():
 
             outputlines = cmd_output.stdout.split('\n')
             if len(outputlines) > 0:
-                log.debug(f"got output for {host}/{nic.name}")
+                log.debug(f"got output for {host}/{nic.name} for target {target}")
                 splitlines = outputlines[0].split()
                 if splitlines[1] == 'via':  # There's a gateway!
                     nic.gateway = splitlines[2]

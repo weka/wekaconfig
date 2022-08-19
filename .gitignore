@@ -3,3 +3,10 @@ venv/*
 venv/**
 __pychache__/**
 __pycache__/*
+wekaconfig.spec
+wekaconfig.tar
+build/*
+build/**
+dist/*
+dist/**
+tarball/*
