@@ -23,6 +23,7 @@ class WekaCluster(object):
             hostid += 1
 
         # host-ips
+        # what if ha/non-ha and same subnet?   They'll all show up in one "network"
         # if self.config.HighAvailability:
         output += "--host-ips="
         for hostname, host in sorted(self.config.selected_hosts.items()):
@@ -36,7 +37,10 @@ class WekaCluster(object):
 
             for nic in this_hosts_ifs:
                 if count > 0:
-                    output += '+'
+                    if self.config.HighAvailability:
+                        output += '+'
+                    else:
+                        continue  # not HA, but has more than one NIC on the same network
                 output += nic.ip.exploded
                 count += 1
             output += ','
@@ -113,8 +117,11 @@ class WekaCluster(object):
 
     def _parity(self):
         base = 'update '
-        data_drives = len(self.config.selected_hosts) - 2
-        result = base + f"--data-drives={data_drives}" + f" --parity-drives=2"
+        # data_drives = len(self.config.selected_hosts) - 2
+        if self.config.datadrives > 16:
+            log.error(f"ERROR: datadrives is {self.config.datadrives}?")
+            self.config.datadrives = 16
+        result = base + f"--data-drives={self.config.datadrives}" + f" --parity-drives={self.config.paritydrives}"
         return result
 
     def _failure_domain(self):

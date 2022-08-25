@@ -29,6 +29,9 @@ class STEMHost(object):
         self.name = name
         self.host_api = None
         self.machine_info = None
+        self.ssh_client = None
+        self.hyperthread = None
+        self.lscpu_data = None
 
     def get_machine_info(self):
         """
@@ -38,10 +41,10 @@ class STEMHost(object):
             self.machine_info = self.host_api.weka_api_command("machine_query_info", parms={})
         except LoginError:
             print(f"host {self.name} failed login querying info")
-            errors = True
+            return
         except CommunicationError:
             print(f"Error communicating with host {self.name} querying info")
-            errors = True
+            return
 
         self.num_cores = len(self.machine_info['cores'])
         self.cpu_model = self.machine_info['cores'][0]['model']
@@ -357,10 +360,14 @@ class WekaHostGroup():
 
     def get_gateways(self, host, nic):
         log.info(f"probing gateway for {host}/{nic.name}")
+        target_interface = None
         # determine which nic.name on the reference host we're going to look at... ie: which network
         for ref_nic in self.referencehost_obj.nics.values():
             if nic.network == ref_nic.network:
                 target_interface = ref_nic.name
+        if target_interface == None:
+            log.error("Error: unable to determine target interface")
+            return
         for target in self.pingable_ips[target_interface]:
             cmd_output = host.ssh_client.run(f"ip route get {target} oif {nic.name}")
 
