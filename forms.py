@@ -214,21 +214,21 @@ class SelectCoresForm(PrevDoneForm):
         for host, cores in xref_dict["cores"].items():
             if reference_cores == 0:
                 reference_cores = cores
-                continue
+                #continue
             else:
                 if cores != reference_cores:
                     # Error!   hosts have different number of cores!
                     errors = True
-                    break
+                    #break
 
             if ref_threads_per_core == 0:
-                ref_threads_per_core = xref_dict["threads"][host]
-                continue
+                ref_threads_per_core = xref_dict["threads"][host] # should be for reference_host
+                #continue
             else:
                 if xref_dict["threads"][host] != ref_threads_per_core:
                     # Error!   hosts have different number of cores!
                     errors = True
-                    break
+                #    break
 
         if errors:
             # make noise

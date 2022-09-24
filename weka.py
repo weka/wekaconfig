@@ -54,7 +54,7 @@ class STEMHost(object):
         self.version = self.machine_info['version']
         # self.info_hw = info_hw  # save a copy in case we need it
         self.dataplane_nics = dict()
-        self.total_ramGB = self.machine_info["memory"]["total"] / 1024 / 1024 / 1024
+        self.total_ramGB = int(self.machine_info["memory"]["total"] / 1024 / 1024 / 1024)
 
         for drive in self.machine_info['disks']:
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
@@ -337,7 +337,7 @@ class WekaHostGroup():
         # default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
         self.host_out = dict()
         print("Probing for gateways")
-        for host, host_obj in self.usable_hosts.items():
+        for host, host_obj in sorted(self.usable_hosts.items()):
             for nicname, nic_obj in host_obj.nics.items():
                 # threaded_method(host_obj, WekaHostGroup.get_gateways, host_obj, nic_obj)
                 self.get_gateways(host_obj, nic_obj)
@@ -425,7 +425,7 @@ class WekaHostGroup():
 
             # check # of drives - {numdrives: [list of host objects]}
             drivehostlist = drives.get(len(host_obj.drives), list())
-            drivehostlist.append(host_obj)
+            drivehostlist.append(str(host_obj))
             drives[len(host_obj.drives)] = drivehostlist
 
             # these_drives = drive_sizes.get(host_obj.drives, list())   # returns list of drives
@@ -457,7 +457,7 @@ class WekaHostGroup():
             homo = False
             log.info("Hosts do not have a homogeneous number of drives")
             for num_drives, drivehostlist in sorted(drives.items()):
-                log.info(f"  There are {len(drivehostlist)} hosts with {num_drives} GB of RAM: {drivehostlist}")
+                log.info(f"  There are {len(drivehostlist)} hosts with {num_drives} drives: {drivehostlist}")
 
         if len(drive_sizes) != 1:
             homo = False
