@@ -24,10 +24,14 @@ class WekaInterface(ipaddress.IPv4Interface):
 
 
 class STEMHost(object):
+    # uses ONLY the API...
     def __init__(self, name):
         self.name = name
         self.host_api = None
         self.machine_info = None
+        self.ssh_client = None
+        self.hyperthread = None
+        self.lscpu_data = None
 
     def get_machine_info(self):
         """
@@ -37,10 +41,10 @@ class STEMHost(object):
             self.machine_info = self.host_api.weka_api_command("machine_query_info", parms={})
         except LoginError:
             print(f"host {self.name} failed login querying info")
-            errors = True
+            return
         except CommunicationError:
             print(f"Error communicating with host {self.name} querying info")
-            errors = True
+            return
 
         self.num_cores = len(self.machine_info['cores'])
         self.cpu_model = self.machine_info['cores'][0]['model']
@@ -50,13 +54,13 @@ class STEMHost(object):
         self.version = self.machine_info['version']
         # self.info_hw = info_hw  # save a copy in case we need it
         self.dataplane_nics = dict()
-        self.total_ramGB = self.machine_info["memory"]["total"] / 1024 / 1024 / 1024
+        self.total_ramGB = int(self.machine_info["memory"]["total"] / 1024 / 1024 / 1024)
 
         for drive in self.machine_info['disks']:
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
                     len(drive['pciAddr']) > 0 and drive['type'] == 'DISK':
                 # not drive['isSwap'] and \     # pukes now; no longer there in 3.13
-                #self.drives[drive['devName']] = drive['devPath']
+                # self.drives[drive['devName']] = drive['devPath']
                 self.drives[drive['devName']] = drive
 
         # need to determine if any of the above drives are actually in use - boot devices, root drives, etc.
@@ -285,8 +289,7 @@ class WekaHostGroup():
             for source_interface in self.referencehost_obj.nics.keys():
                 for targetif, targetip in hostobj.nics.items():
                     if hostname == reference_hostname and source_interface == targetif:
-                        self.pingable_ips[source_interface].append(
-                            targetip)  # should only add the ip on the source interface?
+                        self.pingable_ips[source_interface].append(targetip)
                         continue  # not sure why, but ping fails on loopback anyway
 
                     threaded_method(self, WekaHostGroup.ping_clients, source_interface, hostobj, targetip)
@@ -336,15 +339,16 @@ class WekaHostGroup():
         print(f"Opening ssh to hosts")
         self.open_ssh_toall()
 
-        default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
+        # default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
         self.host_out = dict()
         print("Probing for gateways")
-        for host, host_obj in self.usable_hosts.items():
+        for host, host_obj in sorted(self.usable_hosts.items()):
             for nicname, nic_obj in host_obj.nics.items():
                 # threaded_method(host_obj, WekaHostGroup.get_gateways, host_obj, nic_obj)
                 self.get_gateways(host_obj, nic_obj)
         # parallel(self, WekaHostGroup.get_gateways)
         # default_threader.run()
+        self.get_hostinfo()
 
     def ping_clients(self, source_interface, hostobj, targetip):
         hostname = hostobj.name
@@ -361,10 +365,14 @@ class WekaHostGroup():
 
     def get_gateways(self, host, nic):
         log.info(f"probing gateway for {host}/{nic.name}")
+        target_interface = None
         # determine which nic.name on the reference host we're going to look at... ie: which network
         for ref_nic in self.referencehost_obj.nics.values():
             if nic.network == ref_nic.network:
                 target_interface = ref_nic.name
+        if target_interface == None:
+            log.error("Error: unable to determine target interface")
+            return
         for target in self.pingable_ips[target_interface]:
             cmd_output = host.ssh_client.run(f"ip route get {target} oif {nic.name}")
 
@@ -398,6 +406,7 @@ class WekaHostGroup():
         """
 
         cores = dict()  # dict of {numcores: [hosts]}
+        hyperthreads = dict()
         ram = dict()  # dict of {ram_GB: [hosts]}
         drives = dict()  # dict of {num_drives: [hosts]}
         drive_sizes = dict()
@@ -410,6 +419,10 @@ class WekaHostGroup():
             corehostlist.append(host)
             cores[host_obj.num_cores] = corehostlist
 
+            hyperthreadlist = hyperthreads.get(host_obj.hyperthread, list())
+            hyperthreadlist.append(host)
+            hyperthreads[host_obj.hyperthread] = hyperthreadlist
+
             # check RAM
             ramhostlist = ram.get(int(host_obj.total_ramGB), list())
             ramhostlist.append(host)
@@ -417,10 +430,10 @@ class WekaHostGroup():
 
             # check # of drives - {numdrives: [list of host objects]}
             drivehostlist = drives.get(len(host_obj.drives), list())
-            drivehostlist.append(host_obj)
+            drivehostlist.append(str(host_obj))
             drives[len(host_obj.drives)] = drivehostlist
 
-            #these_drives = drive_sizes.get(host_obj.drives, list())   # returns list of drives
+            # these_drives = drive_sizes.get(host_obj.drives, list())   # returns list of drives
             # find the host_obj.machine_info.disks entry (its a list) where dev_path == these_drives
             for drive in host_obj.drives.values():
                 drive_size_hostlist = drive_sizes.get(drive['sizeBytes'], list())
@@ -428,12 +441,16 @@ class WekaHostGroup():
                     drive_size_hostlist.append(host)
                 drive_sizes[drive['sizeBytes']] = drive_size_hostlist
 
-
         if len(cores) != 1:
             homo = False
             log.info("Hosts do not have a homogeneous number of cores")
             for corecount, corehostlist in sorted(cores.items()):
                 log.info(f"  There are {len(corehostlist)} hosts with {corecount} cores: {corehostlist}")
+
+        if len(hyperthreads) != 1:
+            log.info("Not all hosts share hyperthread/SMT setting")
+            for value, hostlist in hyperthreads.items():
+                log.info(f"  There are {len(hostlist)} hosts with Hyperthreading/SMT {value}: {hostlist}")
 
         if len(ram) != 1:
             homo = False
@@ -445,18 +462,53 @@ class WekaHostGroup():
             homo = False
             log.info("Hosts do not have a homogeneous number of drives")
             for num_drives, drivehostlist in sorted(drives.items()):
-                log.info(f"  There are {len(drivehostlist)} hosts with {num_drives} GB of RAM: {drivehostlist}")
+                log.info(f"  There are {len(drivehostlist)} hosts with {num_drives} drives: {drivehostlist}")
 
         if len(drive_sizes) != 1:
             homo = False
             log.info("Hosts do not have a homogeneous drive sizes")
             for drive_size, drivehostlist in sorted(drive_sizes.items()):
                 log.info(f"  There are {len(drivehostlist)} hosts with " +
-                         f"{round(drive_size/1000/1000/1000/1000, 2)} TB/" +
-                         f"{round(drive_size/1024/1024/1024/1024, 2)} TiB " +
+                         f"{round(drive_size / 1000 / 1000 / 1000 / 1000, 2)} TB/" +
+                         f"{round(drive_size / 1024 / 1024 / 1024 / 1024, 2)} TiB " +
                          f"drives: {drivehostlist}")
 
         return homo
+
+    def get_hostinfo(self):
+        """
+        # get info on the hosts
+        :return:
+        """
+        for host, host_obj in self.usable_hosts.items():
+            threaded_method(self, WekaHostGroup.lscpu, host_obj)
+
+        default_threader.run()
+
+        for host, host_obj in self.usable_hosts.items():
+            threads = host_obj.lscpu_data.get('Thread(s) per core', '')
+            host_obj.hyperthread = False if threads == '1' else True
+            host_obj.threads_per_core = int(threads)
+            log.debug(f"{host} hyperthreading/SMT is {host_obj.hyperthread}")
+
+        pass
+
+    def lscpu(self, hostobj):
+        hostobj.lscpu_data = dict()
+        cmd_output = self.ssh_client.run("lscpu")
+        if cmd_output.status == 0:
+            # we were able to run lscpu
+            outputlines = cmd_output.stdout.split('\n')
+            if len(outputlines) > 0:
+                log.debug(f"got lscpu output for {hostobj.name}")
+                for line in outputlines:
+                    splitlines = line.split(':')
+                    if len(splitlines) > 1:
+                        hostobj.lscpu_data[splitlines[0]] = splitlines[1].strip()
+
+        else:
+            log.error(f"lscpu failed on {hostobj.name}")
+
 
 def beacon_hosts(hostname):
     """

@@ -11,7 +11,7 @@ log = getLogger(__name__)
 
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
     NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts, \
-    HighAvailability, SparesWidget
+    HighAvailability, MBC, SparesWidget
 
 from logic import Cores
 
@@ -144,7 +144,7 @@ class SelectCoresForm(PrevDoneForm):
         if PA.selected_cores is None:  # if we haven't visited this form before
             self.num_cores = self.analyse_cores()
             self.num_drives = self.analyse_drives()
-            PA.selected_cores = Cores(self.num_cores, self.num_drives)
+            PA.selected_cores = Cores(self.num_cores, self.num_drives, PA.MBC)
 
         PA.selected_cores.recalculate()  # make sure they make sense
         # repopulate the data to make sure it's correct on the screen
@@ -199,29 +199,43 @@ class SelectCoresForm(PrevDoneForm):
 
     def analyse_cores(self):
         # let's gather together the info
-        host_cores = dict()
+        xref_dict = dict()
+        xref_dict["cores"] = dict()
+        xref_dict["threads"] = dict()
+
         for hostname in self.parentApp.selected_hosts:
-            host_cores[hostname] = self.parentApp.target_hosts.usable_hosts[hostname].num_cores
+            xref_dict["cores"][hostname] = self.parentApp.target_hosts.usable_hosts[hostname].num_cores
+            xref_dict["threads"][hostname] = self.parentApp.target_hosts.usable_hosts[hostname].threads_per_core
 
         # are they all the same?
         reference_cores = 0
+        ref_threads_per_core = 0
         errors = False
-        for cores in host_cores.values():
+        for host, cores in xref_dict["cores"].items():
             if reference_cores == 0:
                 reference_cores = cores
-                continue
+                #continue
             else:
                 if cores != reference_cores:
                     # Error!   hosts have different number of cores!
                     errors = True
-                    break
+                    #break
+
+            if ref_threads_per_core == 0:
+                ref_threads_per_core = xref_dict["threads"][host] # should be for reference_host
+                #continue
+            else:
+                if xref_dict["threads"][host] != ref_threads_per_core:
+                    # Error!   hosts have different number of cores!
+                    errors = True
+                #    break
 
         if errors:
             # make noise
-            wekatui.notify_confirm("The hosts are not homogenous; they have different numbers of cores.",
+            wekatui.notify_confirm("The hosts are not homogenous; they have different numbers of cores/threads.",
                                    title="Error", form_color='STANDOUT', wrap=True, editw=1)
 
-        return reference_cores
+        return int(reference_cores / ref_threads_per_core)
 
     def analyse_drives(self):
         # let's gather together the info
@@ -290,6 +304,20 @@ class SelectHostsForm(CancelNextForm):
                                  use_two_lines=True, editable=True,
                                  begin_entry_at=2,  # make the list under the title
                                  values=["Yes", "No"])
+        #self.mbc_field = self.add(MBC, name="MBC Configuration:",
+        #                          scroll_exit=True,  # allow them to exit using arrow keys
+        #                          rely=14, relx=41,
+        #                          use_two_lines=True, editable=True,
+        #                          begin_entry_at=2,  # make the list under the title
+        #                          values=["Yes", "No"])
+
+    def beforeEditing(self):
+        PA = self.parentApp
+        if hasattr(self, "mbc_field"):
+            if PA.MBC:
+                self.mbc_field.set_value([0])  # set default value to Yes.
+            else:
+                self.mbc_field.set_value([1])  # set default value to No.
 
     def on_ok(self):
         PA = self.parentApp
@@ -313,6 +341,11 @@ class SelectHostsForm(CancelNextForm):
             PA.HighAvailability = True
         else:
             PA.HighAvailability = False
+
+        if hasattr(self, "mbc_field") and self.mbc_field.value == [0]:
+            PA.MBC = True
+        else:
+            PA.MBC = False
 
         PA.setNextForm("SelectCoresForm")
 

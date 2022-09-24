@@ -159,9 +159,10 @@ class UsableCoresWidget(CoresWidgetBase):
     """specifically for total usable cores"""
 
     def check_value(self):
-        if self.intval not in range(1, 20):
-            return "Please enter a number between 1 and 19"
-        self.parent.parentApp.selected_cores.usable = self.intval
+        PA = self.parent.parentApp
+        if self.intval not in range(1, PA.selected_cores.total - 5 + 1):
+            return f"Please enter a number between 1 and {PA.selected_cores.total - 5}"
+        PA.selected_cores.usable = self.intval
         return None
 
 
@@ -230,7 +231,7 @@ class DataWidget(DataParityBase):
     def _check_value(self):
         PA = self.parent.parentApp
         max_data = (self.clustersize - PA.paritydrives) if self.clustersize < (16 + PA.paritydrives) else 16
-        if self.intval not in range(3, max_data +1):
+        if self.intval not in range(3, max_data + 1):
             return f"Data drives must be between 3 and {max_data}"
         return None
 
@@ -259,8 +260,8 @@ class SparesWidget(DataParityBase):
 
     def _check_value(self):
         PA = self.parent.parentApp
-        if self.intval not in range(0, PA.datadrives -2):
-            return f"Hot Spares must be between 0 and {PA.datadrives -3}"
+        if self.intval not in range(0, PA.datadrives - 2):
+            return f"Hot Spares must be between 0 and {PA.datadrives - 3}"
         return None
 
     def set_values(self):
@@ -342,10 +343,15 @@ class Hosts(wekatui.TitleMultiSelect):
         parent.ha_field.display()
         return True
 
-        # need tui field to show/select if ha or not...
-
 
 class HighAvailability(wekatui.TitleSelectOne):
+    _contained_widgets = wekatui.CheckBox
+
+    def __init__(self, *args, **keywords):
+        super().__init__(*args, **keywords)
+
+
+class MBC(wekatui.TitleSelectOne):
     _contained_widgets = wekatui.CheckBox
 
     def __init__(self, *args, **keywords):
