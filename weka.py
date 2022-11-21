@@ -340,7 +340,8 @@ class WekaHostGroup():
         for host, host_obj in sorted(self.usable_hosts.items()):
             for nicname, nic_obj in host_obj.nics.items():
                 # threaded_method(host_obj, WekaHostGroup.get_gateways, host_obj, nic_obj)
-                self.get_gateways(host_obj, nic_obj)
+                if nic_obj.type != 'IB':    # we don't support routing on IB networks anyway
+                    self.get_gateways(host_obj, nic_obj)
         # parallel(self, WekaHostGroup.get_gateways)
         # default_threader.run()
         self.get_hostinfo()
@@ -358,31 +359,39 @@ class WekaHostGroup():
         else:
             log.debug(f"From {source_interface} target {hostname}-{targetip} failed.")
 
+    def probe_gateway(self, host, nic, target):
+        cmd_output = host.ssh_client.run(f"ip route get {target} oif {nic.name}")
+
+        outputlines = cmd_output.stdout.split('\n')
+        if len(outputlines) > 0:
+            log.debug(f"    got output for {host}/{nic.name}")
+            splitlines = outputlines[0].split()
+            if splitlines[1] == 'via':  # There's a gateway!
+                nic.gateway = splitlines[2]
+                return True
+        else:
+            log.error(f"Error executing 'ip route get' on {host}:{nic.name}:" +
+                      f" return code={cmd_output.exit_code}," +
+                      f" stderr={list(cmd_output.stderr)}")
+        return False
+
     def get_gateways(self, host, nic):
         log.info(f"probing gateway for {host}/{nic.name}")
-        target_interface = None
-        # determine which nic.name on the reference host we're going to look at... ie: which network
-        for ref_nic in self.referencehost_obj.nics.values():
-            if nic.network == ref_nic.network:
-                target_interface = ref_nic.name
-        if target_interface == None:
-            log.error("Error: unable to determine target interface")
-            return
-        for target in self.pingable_ips[target_interface]:
-            cmd_output = host.ssh_client.run(f"ip route get {target} oif {nic.name}")
 
-            outputlines = cmd_output.stdout.split('\n')
-            if len(outputlines) > 0:
-                log.debug(f"got output for {host}/{nic.name}")
-                splitlines = outputlines[0].split()
-                if splitlines[1] == 'via':  # There's a gateway!
-                    nic.gateway = splitlines[2]
-                    print(f"    Host {host}:{nic.name} has gateway {nic.gateway}")
-                    break
-            else:
-                log.error(f"Error executing 'ip route get' on {host}:{nic.name}:" +
-                          f" return code={cmd_output.exit_code}," +
-                          f" stderr={list(cmd_output.stderr)}")
+        # use google DNS to probe for a default gateway, there's no way that's on their network
+        if self.probe_gateway(host, nic, "8.8.8.8"):
+            log.info(f"    Host {host}/{nic.name} has gateway {nic.gateway}")
+            return  # we found a default gateway (it's noted in nic.gateway)
+
+        # look to see if there are gateways to any of the other hosts
+        for interface, ip_list in self.pingable_ips.items():
+            for target in ip_list:
+                if self.probe_gateway(host, nic, target):
+                    log.info(f"    Host {host}/{nic.name} has gateway {nic.gateway}")
+                    return  # we found a gateway (noted in nic.gateway)
+
+        log.info(f"    gateway for {host}/{nic.name} not found")
+
 
     def open_ssh_toall(self):
         self.clients = dict()
