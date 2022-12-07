@@ -84,13 +84,13 @@ class STEMHost(object):
                 #    pass
                 if net_adapter['bondType'] == 'NONE':  # "NONE", "BOND" and "SLAVE" are valid
                     details = self.find_interface_details(net_adapter['name'])
-                elif net_adapter['bondType'] == 'BOND':
+                elif net_adapter['bondType'] == 'BOND' or net_adapter['bondType'] == 'BOND_MLTI_NIC':
                     details = self.find_bond_details(net_adapter['name'])
                 else:
                     continue  # skip slaves
 
                 if len(net_adapter['name_slaves']) != 0:  # what are other values?
-                    print(f"{self.name}:{net_adapter['name']}:name_slaves = {net_adapter['name_slaves']}")
+                    log.info(f"{self.name}:{net_adapter['name']}:name_slaves = {net_adapter['name_slaves']}")
                     pass
 
                 # make sure we were able to get the details we need
@@ -114,7 +114,7 @@ class STEMHost(object):
                     continue
                 if net_adapter['mtu'] < 4000 and speed > 10000:
                     msg = f"Host {self.name}: Net adapter {net_adapter['name']} has low mtu ({net_adapter['mtu']}). Not recommended, but continuing..."
-                    print(f"* WARNING: {msg}")
+                    log.warning(f"* WARNING: {msg}")
 
                 if details['validationCode'] == "OK" and details['linkDetected']:
                     self.nics[net_adapter['name']] = \
@@ -284,7 +284,7 @@ class WekaHostGroup():
 
         print("Exploring network... this may take a while")
         for hostname, hostobj in candidates.items():
-            print(f'Looking at host {hostname}...')
+            log.info(f'Looking at host {hostname}...')
             # see if the reference host can talk to the target ip on each interface
             for source_interface in self.referencehost_obj.nics.keys():
                 for targetif, targetip in hostobj.nics.items():
