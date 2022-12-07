@@ -351,7 +351,7 @@ class HighAvailability(wekatui.TitleSelectOne):
         super().__init__(*args, **keywords)
 
 
-class MBC(wekatui.TitleSelectOne):
+class multicontainer(wekatui.TitleSelectOne):
     _contained_widgets = wekatui.CheckBox
 
     def __init__(self, *args, **keywords):

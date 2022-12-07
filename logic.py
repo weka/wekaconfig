@@ -1,20 +1,30 @@
 ################################################################################################
 # Logic
 ################################################################################################
+import math
 from logging import getLogger
 
 log = getLogger(__name__)
 
 
 class Cores():
-    def __init__(self, total_cores, num_drives, MBC):
+    def __init__(self, total_cores, num_drives, MCB):
         # set default values on init
+        self.MCB = MCB
         self.total = total_cores
         self.usable = total_cores - 5
-        if self.usable > 19 and not MBC:
-            self.usable = 19
-        self.fe = 2
-        self.drives = num_drives
+        self.num_actual_drives = num_drives
+        self.fe = 2     # default to 2 FE cores per server
+        if self.usable > 19 and not self.MCB:    # single container can only have 19 cores max
+            self.usable = min(19, self.total)
+            log.debug(f'Host has {total_cores}, but without MCB, we can only use {self.usable}')
+        else:
+            self.usable = self.total - 5    # leave 5 cores for OS
+        if num_drives > 8 and not MCB:
+            self.drives = math.ceil(num_drives/2)
+        else:
+            self.drives = num_drives
+        self.compute = 0    # will be determined in self.recalculate()
         self.recalculate()
 
     def __str__(self):
@@ -22,13 +32,21 @@ class Cores():
             f"cores: total={self.total}, usable={self.usable}, fe={self.fe}, drives={self.drives}, compute={self.compute}")
 
     def recalculate(self):
+        if self.usable > 19 and not self.MCB:    # single container can only have 19 cores max
+            self.usable = min(19, self.total)
+        #else:
+        #    self.usable = self.total - 5    # leave 5 cores for OS
+        if self.drives > 8 and not self.MCB:      # make sure they make sane decisions? or just warn them?
+            self.drives = math.ceil(self.drives/2)  # maybe should be a warning?
         self.compute = self.usable - self.fe - self.drives
         if self.compute < 0:
-            self.compute = 1
-            self.fe = 1
-            self.drives = 1
-            if self.usable < 3:
-                self.usable = 3
+            # invalid specification
+            self.__init__(self.total, self.num_actual_drives, self.MCB) # re-initialize
+            #self.compute = 1
+            #self.fe = 1
+            #self.drives = 1
+            #if self.usable < 3:
+            #    self.usable = 3
 
 
 def filter_hosts(network_list, host_dict):
