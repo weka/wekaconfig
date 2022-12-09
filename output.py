@@ -269,7 +269,8 @@ class WekaCluster(object):
                 # so we can be sure to 'weka local setup' all of them - not missing any
 
                 # start DRIVES container
-                fp.write(f'ssh {host} "weka local setup host --name drives0 --resources-path /tmp/drives0.json"' + NL)
+                fp.write(f'ssh {host} "weka local setup host --name drives0 --resources-path /tmp/drives0.json"' +
+                         '--join-ips=' + ','.join(host_ips) + NL)
 
             # create cluster
             fp.write(create_command)
@@ -277,7 +278,7 @@ class WekaCluster(object):
             # create compute container
             for host in host_names:  # not sure
                 fp.write(f'ssh {host} weka local setup host --name compute0 --resources-path /tmp/compute0.json ' +
-                         f'--join-ips={host_ips}' + NL)
+                         f'--join-ips=' + ','.join(host_ips) + NL)
             # add drives
             for item in self._drive_add():
                 fp.write(WEKA_CLUSTER + item + NL)
@@ -295,7 +296,7 @@ class WekaCluster(object):
             # start FEs
             for host in host_names:  # not sure
                 fp.write(f'ssh {host} weka local setup host --name frontend0 --resources-path /tmp/frontend0.json ' +
-                         f'--join-ips={host_ips}' + NL)
+                         f'--join-ips=' + ','.join(host_ips) + NL)
 
         pass
 
