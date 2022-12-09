@@ -248,6 +248,7 @@ class WekaCluster(object):
             #fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} /tmp/resources_generator.py -f --path /tmp ')
             for host in host_names:  # not sure
                 # run resources generator on each host
+                fp.write(f"echo Running Resources generator on host {host}")
                 fp.write(f'scp ./resources_generator.py {host}:/tmp/' + NL)
                 fp.write(f'ssh {host} "weka local stop; weka local rm -f default"' + NL)
                 fp.write(f'ssh {host} /tmp/resources_generator.py -f --path /tmp --net')
@@ -269,6 +270,7 @@ class WekaCluster(object):
                 # so we can be sure to 'weka local setup' all of them - not missing any
 
                 # start DRIVES container
+                fp.write(f"echo Starting Drives container on host {host}" + NL)
                 fp.write(f'ssh {host} "weka local setup host --name drives0 --resources-path /tmp/drives0.json"' + NL)
                          #'--join-ips=' + ','.join(host_ips) + NL)
 
@@ -277,6 +279,7 @@ class WekaCluster(object):
 
             # create compute container
             for host in host_names:  # not sure
+                fp.write(f"echo Starting Compute container on host {host}" + NL)
                 fp.write(f'ssh {host} weka local setup host --name compute0 --resources-path /tmp/compute0.json ' +
                          f'--join-ips=' + ','.join(host_ips) + NL)
             # add drives
@@ -295,9 +298,11 @@ class WekaCluster(object):
             # start-io
             # start FEs
             for host in host_names:  # not sure
+                fp.write(f"echo Starting Front container on host {host}" + NL)
                 fp.write(f'ssh {host} weka local setup host --name frontend0 --resources-path /tmp/frontend0.json ' +
                          f'--join-ips=' + ','.join(host_ips) + NL)
 
+            fp.write(f"echo Configuration process complete" + NL)
         pass
 
     def cluster_config_scb(self, file):
