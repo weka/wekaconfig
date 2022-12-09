@@ -248,7 +248,7 @@ class WekaCluster(object):
             #fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} /tmp/resources_generator.py -f --path /tmp ')
             for host in host_names:  # not sure
                 # run resources generator on each host
-                fp.write(f"echo Running Resources generator on host {host}")
+                fp.write(f"echo Running Resources generator on host {host}" + NL)
                 fp.write(f'scp ./resources_generator.py {host}:/tmp/' + NL)
                 fp.write(f'ssh {host} "weka local stop; weka local rm -f default"' + NL)
                 fp.write(f'ssh {host} /tmp/resources_generator.py -f --path /tmp --net')
