@@ -11,7 +11,7 @@ log = getLogger(__name__)
 
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
     NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts, \
-    HighAvailability, multicontainer, SparesWidget
+    HighAvailability, Multicontainer, SparesWidget
 
 from logic import Cores
 
@@ -144,7 +144,7 @@ class SelectCoresForm(PrevDoneForm):
         if PA.selected_cores is None:  # if we haven't visited this form before
             self.num_cores = self.analyse_cores()
             self.num_drives = self.analyse_drives()
-            PA.selected_cores = Cores(self.num_cores, self.num_drives, PA.multicontainer)
+            PA.selected_cores = Cores(self.num_cores, self.num_drives, PA.Multicontainer)
 
         PA.selected_cores.recalculate()  # make sure they make sense
         # repopulate the data to make sure it's correct on the screen
@@ -300,21 +300,21 @@ class SelectHostsForm(CancelNextForm):
         #        "          1         2         3         4"] ) # testing
         self.ha_field = self.add(HighAvailability, name="High Availability:",
                                  scroll_exit=True,  # allow them to exit using arrow keys
-                                 rely=10, relx=41,
+                                 rely=8, relx=41,
                                  use_two_lines=True, editable=True,
                                  begin_entry_at=2,  # make the list under the title
                                  values=["Yes", "No"])
-        #self.multicontainer_field = self.add(multicontainer, name="multicontainer Configuration:",
-        #                          scroll_exit=True,  # allow them to exit using arrow keys
-        #                          rely=14, relx=41,
-        #                          use_two_lines=True, editable=True,
-        #                          begin_entry_at=2,  # make the list under the title
-        #                          values=["Yes", "No"])
+        self.multicontainer_field = self.add(Multicontainer, name="Multicontainer:",
+                                             scroll_exit=True,  # allow them to exit using arrow keys
+                                             rely=12, relx=41,
+                                             use_two_lines=True, editable=True,
+                                             begin_entry_at=2,  # make the list under the title
+                                             values=["Yes", "No"])
 
     def beforeEditing(self):
         PA = self.parentApp
         if hasattr(self, "multicontainer_field"):
-            if PA.multicontainer:
+            if PA.Multicontainer:
                 self.multicontainer_field.set_value([0])  # set default value to Yes.
             else:
                 self.multicontainer_field.set_value([1])  # set default value to No.
@@ -343,9 +343,9 @@ class SelectHostsForm(CancelNextForm):
             PA.HighAvailability = False
 
         if hasattr(self, "multicontainer_field") and self.multicontainer_field.value == [0]:
-            PA.multicontainer = True
+            PA.Multicontainer = True
         else:
-            PA.multicontainer = False
+            PA.Multicontainer = False
 
         PA.setNextForm("SelectCoresForm")
 

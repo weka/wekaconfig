@@ -3,6 +3,7 @@
 ################################################################################################
 
 import curses.ascii
+import math
 
 import wekatui
 
@@ -160,8 +161,17 @@ class UsableCoresWidget(CoresWidgetBase):
 
     def check_value(self):
         PA = self.parent.parentApp
-        if self.intval not in range(1, PA.selected_cores.total - 5 + 1):
-            return f"Please enter a number between 1 and {PA.selected_cores.total - 5}"
+
+        if PA.Multicontainer:
+            maxcores = PA.selected_cores.total - 2
+        else:
+            if PA.selected_cores.total < 22:
+                maxcores = PA.selected_cores.total - 2
+            else:
+                maxcores = 19   # max 19 per container and this is SBC
+
+        if self.intval not in range(1, maxcores + 1):
+            return f"Please enter a number between 1 and {maxcores}"
         PA.selected_cores.usable = self.intval
         return None
 
@@ -187,9 +197,12 @@ class DrivesCoresWidget(CoresWidgetBase):
         if self.intval > PA.selected_cores.usable:
             return "Cannot exceed Usable Cores"
         elif self.intval == 0:
-            return "It is recommended to use at least 1 FE core"
-        elif self.intval != PA.selected_cores.drives:
-            wekatui.notify_wait("It is recommended to use 1 core per drive")
+            return "It is required to use at least 1 FE core"
+        elif self.intval < PA.datadrives:
+            wekatui.notify_wait(f"NOTE: It is not recommended to have fewer drive cores than there are drives")
+        elif self.intval != PA.datadrives and self.intval != PA.datadrives * 2 and self.intval != PA.datadrives * 3:
+            wekatui.notify_wait(f"NOTE: The hosts have {PA.datadrives} drives, and you have selected a configuration" +
+                                "that does not follow the best practice of 1, 2, or 3 drives per core")
         self.parent.parentApp.selected_cores.drives = self.intval
         return None
 
@@ -351,7 +364,7 @@ class HighAvailability(wekatui.TitleSelectOne):
         super().__init__(*args, **keywords)
 
 
-class multicontainer(wekatui.TitleSelectOne):
+class Multicontainer(wekatui.TitleSelectOne):
     _contained_widgets = wekatui.CheckBox
 
     def __init__(self, *args, **keywords):

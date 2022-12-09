@@ -54,9 +54,9 @@ class WekaConfigApp(wekatui.NPSAppManaged):
         self.cloud_enable = None
         self.weka_ver = hostgroup.referencehost_obj.version.split('.')
         if int(self.weka_ver[0]) < 4:
-            self.multicontainer = False
+            self.Multicontainer = False
         else:
-            self.multicontainer = True
+            self.Multicontainer = True
 
         log.info("starting UI...")
 
