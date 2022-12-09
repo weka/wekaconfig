@@ -231,7 +231,7 @@ class WekaCluster(object):
         host_names, host_ips = self._host_names()
         hosts_names_string = ' '.join(host_names)
         #hosts_ips_string = ','.join(host_ips)
-        create_command = 'weka cluster create ' + ' '.join(host_names) + ' --join-ips=' + ','.join(host_ips) + NL
+        create_command = 'weka cluster create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips) + NL
         with file as fp:
             fp.write('# /usr/bin/bash' + NL)
             fp.write(NL)
