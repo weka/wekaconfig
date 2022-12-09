@@ -235,8 +235,8 @@ class WekaCluster(object):
         with file as fp:
             fp.write('# /usr/bin/bash' + NL)
             fp.write(NL)
-            fp.write('# NOTE this is an experimental feature, and this script may not be correct')
-            fp.write('# you should manually verify that it will do what you want/expect')
+            fp.write('# NOTE this is an experimental feature, and this script may not be correct' + NL)
+            fp.write('# you should manually verify that it will do what you want/expect' + NL)
             fp.write(NL)
             #fp.write("HOSTS=" + hosts_names_string + NL)
             #fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  scp ./resources_generator.py {}:/tmp/' + NL)
@@ -262,7 +262,8 @@ class WekaCluster(object):
                 fp.write(f' --compute-dedicated-cores {cores.usable - cores.drives - cores.fe}') # needs update?
                 fp.write(f' --drive-dedicated-cores {cores.drives}')
                 fp.write(f' --frontend-dedicated-cores {cores.fe}')
-                fp.write(f' --compute-memory {self.config.memory}GiB')
+                if hasattr(self.config, "memory"):
+                    fp.write(f' --compute-memory {self.config.memory}GiB')
                 fp.write(NL)
                 # probably need to look how many containers of each type it created and note that in the host
                 # so we can be sure to 'weka local setup' all of them - not missing any
