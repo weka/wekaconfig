@@ -168,7 +168,7 @@ class UsableCoresWidget(CoresWidgetBase):
             if PA.selected_cores.total < 22:
                 maxcores = PA.selected_cores.total - 2
             else:
-                maxcores = 19   # max 19 per container and this is SBC
+                maxcores = 19  # max 19 per container and this is SBC
 
         if self.intval not in range(1, maxcores + 1):
             return f"Please enter a number between 1 and {maxcores}"

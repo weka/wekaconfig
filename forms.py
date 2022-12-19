@@ -184,8 +184,18 @@ class SelectCoresForm(PrevDoneForm):
         PA.dedicated = True if 0 in self.misc_field.value else False
         PA.auto_failure_domain = True if 1 in self.misc_field.value else False
         PA.cloud_enable = True if 2 in self.misc_field.value else False
+        if self.multicontainer:
+            PA.num_containers_per_host = 3
+            if PA.selected_cores.drives > 19:
+                PA.num_containers_per_host += 1
+            if PA.selected_cores.compute > 19:
+                PA.num_containers_per_host += 1
+            if PA.selected_cores.fe > 19:
+                PA.num_containers_per_host += 1
+        else:
+            PA.num_containers_per_host = 1
 
-    # this happens when they hit the OK button
+            # this happens when they hit the OK button
     def on_ok(self):
         # The next two lines terminate the app cleanly, so we should generate the config
         self.save_values()
