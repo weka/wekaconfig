@@ -104,11 +104,11 @@ class WekaCluster(object):
             #else:
             #    gateway = ''
             #thishost = f"{base} {host.host_id} {nic.name} --netmask={nic.network.prefixlen} {gateway}"
-            fullname = f"{nic.name}/{nic.network.prefixlen}"
+            #fullname = f"{nic.name}/{nic.network.prefixlen}"
             if nic.gateway is not None:
-                fullname = f"{nic.name}/{nic.network.prefixlen}/{nic.gateway}"
+                fullname = f"{nic.name}/{nic.netmask.exploded}/{nic.gateway}"
             else:
-                fullname = f"{nic.name}/{nic.network.prefixlen}"
+                fullname = f"{nic.name}/{nic.netmask.exploded}"
             result.append(fullname)
 
         return result
