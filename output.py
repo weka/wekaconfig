@@ -254,9 +254,9 @@ class WekaCluster(object):
             for host in host_names:  # not sure
                 # run resources generator on each host
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
-                fp.write(f'sudo scp ./resources_generator.py {host}:/tmp/' + NL)
-                fp.write(f'sudo ssh {host} "weka local stop; weka local rm -f default"' + NL)
-                fp.write(f'sudo ssh {host} /tmp/resources_generator.py -f --path /tmp --net')
+                fp.write(f'scp ./resources_generator.py {host}:/tmp/' + NL)
+                fp.write(f'ssh {host} "sudo weka local stop; weka local rm -f default"' + NL)
+                fp.write(f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
                 net_names = self._get_nics(host)
                 for name in net_names:
                     fp.write(f" {name}")
@@ -276,7 +276,7 @@ class WekaCluster(object):
 
                 # start DRIVES container
                 fp.write(f"echo Starting Drives container on host {host}" + NL)
-                fp.write(f'sudo ssh {host} "weka local setup host --name drives0 --resources-path /tmp/drives0.json"' + NL)
+                fp.write(f'ssh {host} "sudo weka local setup host --name drives0 --resources-path /tmp/drives0.json"' + NL)
                          #'--join-ips=' + ','.join(host_ips) + NL)
 
             # create cluster
@@ -288,7 +288,7 @@ class WekaCluster(object):
             # create compute container
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Compute container on host {host}" + NL)
-                fp.write(f'sudo ssh {host} weka local setup host --name compute0 --resources-path /tmp/compute0.json ' +
+                fp.write(f'ssh {host} sudo weka local setup host --name compute0 --resources-path /tmp/compute0.json ' +
                          f'--join-ips=' + ','.join(host_ips) + NL)
             # add drives
             fp.write(NL)
@@ -310,7 +310,7 @@ class WekaCluster(object):
             fp.write(NL)
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Front container on host {host}" + NL)
-                fp.write(f'sudo ssh {host} weka local setup host --name frontend0 --resources-path /tmp/frontend0.json ' +
+                fp.write(f'ssh {host} sudo weka local setup host --name frontend0 --resources-path /tmp/frontend0.json ' +
                          f'--join-ips=' + ','.join(host_ips) + NL)
 
             fp.write(f"echo Configuration process complete" + NL)
