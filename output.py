@@ -104,7 +104,12 @@ class WekaCluster(object):
             #else:
             #    gateway = ''
             #thishost = f"{base} {host.host_id} {nic.name} --netmask={nic.network.prefixlen} {gateway}"
-            result.append(nic.name)
+            fullname = f"{nic.name}/{nic.network.prefixlen}"
+            if nic.gateway is not None:
+                fullname = f"{nic.name}/{nic.network.prefixlen}/{nic.gateway}"
+            else:
+                fullname = f"{nic.name}/{nic.network.prefixlen}"
+            result.append(fullname)
 
         return result
 
@@ -225,13 +230,13 @@ class WekaCluster(object):
             self.cluster_config_scb(file)
 
     def cluster_config_mcb(self, file):
-        WEKA_CLUSTER = "weka cluster "
-        WEKA = "weka "
+        WEKA_CLUSTER = "sudo weka cluster "
+        WEKA = "sudo weka "
         NL = "\n"
         host_names, host_ips = self._host_names()
         hosts_names_string = ' '.join(host_names)
         #hosts_ips_string = ','.join(host_ips)
-        create_command = 'weka cluster create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips) + NL
+        create_command = 'sudo weka cluster create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips) + NL
         with file as fp:
             fp.write('# /usr/bin/bash' + NL)
             fp.write(NL)
@@ -249,9 +254,9 @@ class WekaCluster(object):
             for host in host_names:  # not sure
                 # run resources generator on each host
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
-                fp.write(f'scp ./resources_generator.py {host}:/tmp/' + NL)
-                fp.write(f'ssh {host} "weka local stop; weka local rm -f default"' + NL)
-                fp.write(f'ssh {host} /tmp/resources_generator.py -f --path /tmp --net')
+                fp.write(f'sudo scp ./resources_generator.py {host}:/tmp/' + NL)
+                fp.write(f'sudo ssh {host} "weka local stop; weka local rm -f default"' + NL)
+                fp.write(f'sudo ssh {host} /tmp/resources_generator.py -f --path /tmp --net')
                 net_names = self._get_nics(host)
                 for name in net_names:
                     fp.write(f" {name}")
@@ -271,7 +276,7 @@ class WekaCluster(object):
 
                 # start DRIVES container
                 fp.write(f"echo Starting Drives container on host {host}" + NL)
-                fp.write(f'ssh {host} "weka local setup host --name drives0 --resources-path /tmp/drives0.json"' + NL)
+                fp.write(f'sudo ssh {host} "weka local setup host --name drives0 --resources-path /tmp/drives0.json"' + NL)
                          #'--join-ips=' + ','.join(host_ips) + NL)
 
             # create cluster
@@ -280,7 +285,7 @@ class WekaCluster(object):
             # create compute container
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Compute container on host {host}" + NL)
-                fp.write(f'ssh {host} weka local setup host --name compute0 --resources-path /tmp/compute0.json ' +
+                fp.write(f'sudo ssh {host} weka local setup host --name compute0 --resources-path /tmp/compute0.json ' +
                          f'--join-ips=' + ','.join(host_ips) + NL)
             # add drives
             for item in self._drive_add():
@@ -299,7 +304,7 @@ class WekaCluster(object):
             # start FEs
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Front container on host {host}" + NL)
-                fp.write(f'ssh {host} weka local setup host --name frontend0 --resources-path /tmp/frontend0.json ' +
+                fp.write(f'sudo ssh {host} weka local setup host --name frontend0 --resources-path /tmp/frontend0.json ' +
                          f'--join-ips=' + ','.join(host_ips) + NL)
 
             fp.write(f"echo Configuration process complete" + NL)
