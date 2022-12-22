@@ -280,7 +280,10 @@ class WekaCluster(object):
                          #'--join-ips=' + ','.join(host_ips) + NL)
 
             # create cluster
+            fp.write(NL)
             fp.write(create_command)
+            fp.write("sleep 60 " + NL)
+            fp.write(NL)
 
             # create compute container
             for host in host_names:  # not sure
@@ -288,8 +291,10 @@ class WekaCluster(object):
                 fp.write(f'sudo ssh {host} weka local setup host --name compute0 --resources-path /tmp/compute0.json ' +
                          f'--join-ips=' + ','.join(host_ips) + NL)
             # add drives
+            fp.write(NL)
             for item in self._drive_add():
                 fp.write(WEKA_CLUSTER + item + NL)
+            fp.write(NL)
 
             fp.write(WEKA_CLUSTER + self._parity() + NL)
             fp.write(WEKA_CLUSTER + self._hot_spare() + NL)
@@ -302,6 +307,7 @@ class WekaCluster(object):
 
             # start-io
             # start FEs
+            fp.write(NL)
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Front container on host {host}" + NL)
                 fp.write(f'sudo ssh {host} weka local setup host --name frontend0 --resources-path /tmp/frontend0.json ' +
