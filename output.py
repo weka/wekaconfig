@@ -16,7 +16,7 @@ class WekaCluster(object):
     def _create(self):
         output = 'create '
         host_names, host_ips = self._host_names()
-        result = 'create ' + ' '.join(host_names) + ' --join-ips=' + ','.join(host_ips)
+        result = 'create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips)
         return result
 
     def _host_names(self): 	# sets what the hostids will/should be
