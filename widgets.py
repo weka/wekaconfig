@@ -354,6 +354,7 @@ class Hosts(wekatui.TitleMultiSelect):
             parent.ha_field.set_value([1])
             parent.ha_field.editable = False
         parent.ha_field.display()
+        parent.multicontainer_field.display()
         return True
 
 

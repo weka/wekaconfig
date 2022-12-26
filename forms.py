@@ -184,6 +184,7 @@ class SelectCoresForm(PrevDoneForm):
         PA.dedicated = True if 0 in self.misc_field.value else False
         PA.auto_failure_domain = True if 1 in self.misc_field.value else False
         PA.cloud_enable = True if 2 in self.misc_field.value else False
+        # calculate the number of containers we'll have
         if PA.Multicontainer:
             PA.num_containers_per_host = 3
             if PA.selected_cores.drives > 19:
