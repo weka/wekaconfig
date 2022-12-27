@@ -11,7 +11,7 @@ log = getLogger(__name__)
 
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
     NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts, \
-    HighAvailability, MBC, SparesWidget
+    HighAvailability, Multicontainer, SparesWidget
 
 from logic import Cores
 
@@ -144,7 +144,7 @@ class SelectCoresForm(PrevDoneForm):
         if PA.selected_cores is None:  # if we haven't visited this form before
             self.num_cores = self.analyse_cores()
             self.num_drives = self.analyse_drives()
-            PA.selected_cores = Cores(self.num_cores, self.num_drives, PA.MBC)
+            PA.selected_cores = Cores(self.num_cores, self.num_drives, PA.Multicontainer)
 
         PA.selected_cores.recalculate()  # make sure they make sense
         # repopulate the data to make sure it's correct on the screen
@@ -184,8 +184,19 @@ class SelectCoresForm(PrevDoneForm):
         PA.dedicated = True if 0 in self.misc_field.value else False
         PA.auto_failure_domain = True if 1 in self.misc_field.value else False
         PA.cloud_enable = True if 2 in self.misc_field.value else False
+        # calculate the number of containers we'll have
+        if PA.Multicontainer:
+            PA.num_containers_per_host = 3
+            if PA.selected_cores.drives > 19:
+                PA.num_containers_per_host += 1
+            if PA.selected_cores.compute > 19:
+                PA.num_containers_per_host += 1
+            if PA.selected_cores.fe > 19:
+                PA.num_containers_per_host += 1
+        else:
+            PA.num_containers_per_host = 1
 
-    # this happens when they hit the OK button
+            # this happens when they hit the OK button
     def on_ok(self):
         # The next two lines terminate the app cleanly, so we should generate the config
         self.save_values()
@@ -300,24 +311,24 @@ class SelectHostsForm(CancelNextForm):
         #        "          1         2         3         4"] ) # testing
         self.ha_field = self.add(HighAvailability, name="High Availability:",
                                  scroll_exit=True,  # allow them to exit using arrow keys
-                                 rely=10, relx=41,
+                                 rely=8, relx=41,
                                  use_two_lines=True, editable=True,
                                  begin_entry_at=2,  # make the list under the title
                                  values=["Yes", "No"])
-        #self.mbc_field = self.add(MBC, name="MBC Configuration:",
-        #                          scroll_exit=True,  # allow them to exit using arrow keys
-        #                          rely=14, relx=41,
-        #                          use_two_lines=True, editable=True,
-        #                          begin_entry_at=2,  # make the list under the title
-        #                          values=["Yes", "No"])
+        self.multicontainer_field = self.add(Multicontainer, name="Multicontainer:",
+                                             scroll_exit=True,  # allow them to exit using arrow keys
+                                             rely=12, relx=41,
+                                             use_two_lines=True, editable=True,
+                                             begin_entry_at=2,  # make the list under the title
+                                             values=["Yes", "No"])
 
     def beforeEditing(self):
         PA = self.parentApp
-        if hasattr(self, "mbc_field"):
-            if PA.MBC:
-                self.mbc_field.set_value([0])  # set default value to Yes.
+        if hasattr(self, "multicontainer_field"):
+            if PA.Multicontainer:
+                self.multicontainer_field.set_value([0])  # set default value to Yes.
             else:
-                self.mbc_field.set_value([1])  # set default value to No.
+                self.multicontainer_field.set_value([1])  # set default value to No.
 
     def on_ok(self):
         PA = self.parentApp
@@ -342,10 +353,10 @@ class SelectHostsForm(CancelNextForm):
         else:
             PA.HighAvailability = False
 
-        if hasattr(self, "mbc_field") and self.mbc_field.value == [0]:
-            PA.MBC = True
+        if hasattr(self, "multicontainer_field") and self.multicontainer_field.value == [0]:
+            PA.Multicontainer = True
         else:
-            PA.MBC = False
+            PA.Multicontainer = False
 
         PA.setNextForm("SelectCoresForm")
 
