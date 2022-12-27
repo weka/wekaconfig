@@ -254,7 +254,7 @@ class WekaCluster(object):
             for host in host_names:  # not sure
                 # run resources generator on each host
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
-                fp.write(f'scp ./resources_generator.py {host}:/tmp/' + NL)
+                fp.write(f'scp -p ./resources_generator.py {host}:/tmp/' + NL)
                 fp.write(f'ssh {host} "sudo weka local stop; sudo weka local rm -f default"' + NL)
                 fp.write(f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
                 net_names = self._get_nics(host)
