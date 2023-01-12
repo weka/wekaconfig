@@ -16,7 +16,7 @@ class WekaCluster(object):
     def _create(self):
         output = 'create '
         host_names, host_ips = self._host_names()
-        result = 'create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips)
+        result = 'create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips) + " -T infinite"
         return result
 
     def _host_names(self): 	# sets what the hostids will/should be
@@ -236,7 +236,8 @@ class WekaCluster(object):
         host_names, host_ips = self._host_names()
         hosts_names_string = ' '.join(host_names)
         #hosts_ips_string = ','.join(host_ips)
-        create_command = 'sudo weka cluster create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips) + NL
+        create_command = WEKA_CLUSTER + 'create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips) \
+                         + " -T infinite" + NL
         with file as fp:
             fp.write('# /usr/bin/bash' + NL)
             fp.write(NL)
@@ -282,7 +283,7 @@ class WekaCluster(object):
             # create cluster
             fp.write(NL)
             fp.write(create_command)
-            fp.write("sleep 60 " + NL)
+            #fp.write("sleep 60 " + NL)
             fp.write(NL)
 
             # create compute container
