@@ -157,9 +157,14 @@ class SelectCoresForm(PrevDoneForm):
         self.drives_cores_field.set_value(str(PA.selected_cores.drives))
 
         self.name_field.set_value(PA.clustername)
-        if PA.datadrives is None or (PA.datadrives + PA.paritydrives) > len(PA.selected_hosts):
-            PA.datadrives = len(PA.selected_hosts) - 2
-            PA.paritydrives = 2
+        if PA.datadrives is None \
+                or (PA.datadrives + PA.paritydrives) > len(PA.selected_hosts):
+            if len(PA.selected_hosts) <= 18:
+                PA.datadrives = max(len(PA.selected_hosts) - 3, 3)
+                PA.paritydrives = 2
+            else:
+                PA.datadrives = 16
+                PA.paritydrives = 2
 
         if PA.datadrives > 16:
             PA.datadrives = 16
