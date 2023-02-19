@@ -231,6 +231,14 @@ class DataParityBase(CoresWidgetBase):
             return f"The most data drives for a cluster of {self.clustersize} hosts is {self.clustersize - 2}"
         elif self.intval + PA.paritydrives > self.clustersize:
             PA.paritydrives = 2
+
+        if self.intval + PA.paritydrives == self.clustersize \
+                and self.clustersize > 5:
+            wekatui.notify_wait(f"Stripe width" \
+                    + f" ({self.intval}+{PA.paritydrives}) matches cluster "
+                    + "size, forming a narrow cluster. Using a stripe width "
+                    + f"of {self.intval - 1}+{PA.paritydrives} is strongly "
+                    + "recommended instead.")
         return self._check_value()
 
     def _check_value(self):
