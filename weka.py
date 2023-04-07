@@ -382,15 +382,16 @@ class WekaHostGroup():
     def probe_gateway(self, host, nic, target):
         cmd_output = host.ssh_client.run(f"ip route get {target} oif {nic.name}")
 
-        outputlines = cmd_output.stdout.split('\n')
-        if len(outputlines) > 0:
-            splitlines = outputlines[0].split()
-            if splitlines[1] == 'via':  # There's a gateway!
-                nic.gateway = splitlines[2]
-                return True
-        else:
-            log.error(f"Error executing 'ip route get' on {host}:{nic.name}:" +
-                      f" return code={cmd_output.exit_code}," +
+        if cmd_output.status == 0:
+            outputlines = cmd_output.stdout.split('\n')
+            if len(outputlines) > 0:
+                splitlines = outputlines[0].split()
+                if splitlines[1] == 'via':  # There's a gateway!
+                    nic.gateway = splitlines[2]
+                    return True
+
+        log.debug(f"Error executing 'ip route get' on {host}:{nic.name}:" +
+                      f" return code={cmd_output.status}," +
                       f" stderr={list(cmd_output.stderr)}")
         return False
 
