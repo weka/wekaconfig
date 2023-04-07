@@ -286,11 +286,15 @@ class WekaCluster(object):
             #fp.write("sleep 60 " + NL)
             fp.write(NL)
 
+            # for the remaining 'local setup container' commands, we want a comma-separated list of all host_ips
+            host_ips_string = ','.join(host_ips).replace('+', ',')
+
+            WKSC="weka local setup container"
             # create compute container
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Compute container on host {host}" + NL)
-                fp.write(f'ssh {host} sudo weka local setup host --name compute0 --resources-path /tmp/compute0.json ' +
-                         f'--join-ips=' + ','.join(host_ips) + NL)
+                fp.write(f'ssh {host} sudo ' + WKSC + ' --name compute0 --resources-path /tmp/compute0.json ' +
+                         f'--join-ips=' + host_ips_string + NL)
             # add drives
             fp.write(NL)
             for item in self._drive_add():
@@ -311,8 +315,8 @@ class WekaCluster(object):
             fp.write(NL)
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Front container on host {host}" + NL)
-                fp.write(f'ssh {host} sudo weka local setup host --name frontend0 --resources-path /tmp/frontend0.json ' +
-                         f'--join-ips=' + ','.join(host_ips) + NL)
+                fp.write(f'ssh {host} sudo ' + WKSC + ' --name frontend0 --resources-path /tmp/frontend0.json ' +
+                         f'--join-ips=' + host_ips_string + NL)
 
             fp.write(f"echo Configuration process complete" + NL)
         pass
