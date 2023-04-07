@@ -289,7 +289,13 @@ class WekaCluster(object):
             # for the remaining 'local setup container' commands, we want a comma-separated list of all host_ips
             host_ips_string = ','.join(host_ips).replace('+', ',')
 
-            WLSC="weka local setup container"
+            # changing versions
+            WLS = 'weka local setup '
+            if self.config.weka_ver[0] == '4' and int(self.config.weka_ver[1]) >= 1:
+                WLSC = WLS + 'container'
+            else:
+                WLSC = WLS + 'host'
+
             # create compute container
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Compute container on host {host}" + NL)
