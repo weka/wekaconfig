@@ -297,10 +297,12 @@ class WekaCluster(object):
                 WLSC = WLS + 'host'
 
             # create compute container
+            hostid=0
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Compute container on host {host}" + NL)
                 fp.write(f'ssh {host} sudo ' + WLSC + ' --name compute0 --resources-path /tmp/compute0.json ' +
-                         f'--join-ips=' + host_ips_string + NL)
+                         f'--join-ips={host_ips_string} --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
+                hostid += 1
             # add drives
             fp.write(NL)
             for item in self._drive_add():
@@ -319,10 +321,12 @@ class WekaCluster(object):
             # start-io
             # start FEs
             fp.write(NL)
+            hostid=0
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Front container on host {host}" + NL)
                 fp.write(f'ssh {host} sudo ' + WLSC + ' --name frontend0 --resources-path /tmp/frontend0.json ' +
-                         f'--join-ips=' + host_ips_string + NL)
+                         f'--join-ips={host_ips_string} --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
+                hostid += 1
 
             fp.write(f"echo Configuration process complete" + NL)
         pass
