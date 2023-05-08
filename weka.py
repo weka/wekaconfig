@@ -371,8 +371,8 @@ class WekaHostGroup():
         if not self.probe_gateway(host, nic, '8.8.8.8'):
             # no default gateway, see if there are any gateways to the other nodes...
             for interface, target in self.pingable_ips.items():
-                if not self.probe_gateway(host, nic, target):
-                    continue
+                if self.probe_gateway(host, nic, target):
+                    break
         if nic.gateway is not None:
             log.info(f"    {host}/{nic.name} has gateway {nic.gateway}")
         else:
