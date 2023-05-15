@@ -238,6 +238,14 @@ class WekaCluster(object):
         #hosts_ips_string = ','.join(host_ips)
         create_command = WEKA_CLUSTER + 'create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips) \
                          + " -T infinite" + NL
+
+        # changing versions
+        WLS = 'weka local setup '
+        if self.config.weka_ver[0] == '4' and int(self.config.weka_ver[1]) >= 1:
+            WLSC = WLS + 'container'
+        else:
+            WLSC = WLS + 'host'
+
         with file as fp:
             fp.write('# /usr/bin/bash' + NL)
             fp.write(NL)
@@ -252,7 +260,19 @@ class WekaCluster(object):
             #      --net ens6np0 --compute-dedicated-cores 11 --drive-dedicated-cores 6 --frontend-dedicated-cores 2
             #      --compute-memory 96GiB
             #fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} /tmp/resources_generator.py -f --path /tmp ')
+
+            # Note that we are not aware of how many resource files are
+            # created; we simply remove any existing ones, generate new ones,
+            # then loop over whichever resource files exist.
+
             for host in host_names:  # not sure
+                # Remove any existing resource files
+                fp.write(f"echo Removing old resource files on host {host}")
+                fp.write(f"ssh {host} sudo find /tmp/ -maxdepth 1 "
+                         + '-regextype posix-extended '
+                         + "-regex '/tmp/(compute|drives|frontend)[0-9]+.json$' "
+                         + '-exec rm -f {} +')
+
                 # run resources generator on each host
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
                 fp.write(f'scp -p ./resources_generator.py {host}:/tmp/' + NL)
@@ -272,13 +292,16 @@ class WekaCluster(object):
                 if hasattr(self.config, "memory"):
                     fp.write(f' --compute-memory {self.config.memory}GiB')
                 fp.write(NL)
-                # probably need to look how many containers of each type it created and note that in the host
-                # so we can be sure to 'weka local setup' all of them - not missing any
 
-                # start DRIVES container
-                fp.write(f"echo Starting Drives container on host {host}" + NL)
-                fp.write(f'ssh {host} "sudo weka local setup host --name drives0 --resources-path /tmp/drives0.json"' + NL)
-                         #'--join-ips=' + ','.join(host_ips) + NL)
+                # start DRIVES container(s)
+                fp.write(f'echo Starting drives container(s) on host {host}\n')
+                #ssh {host} "sudo weka local setup host --name drives0 --resources-path /tmp/drives0.json"' + NL)
+                fp.write(f'ssh {host} \'cd /tmp/;'
+                         "for container_json in drives*.json; do"
+                         f'sudo {WLSC} --name "$\{container_json%.json}" '
+                         '--resources-path /tmp/"$container_json"; '
+                         'done\''
+                         '')
 
             # create cluster
             fp.write(NL)
@@ -289,19 +312,18 @@ class WekaCluster(object):
             # for the remaining 'local setup container' commands, we want a comma-separated list of all host_ips
             host_ips_string = ','.join(host_ips).replace('+', ',')
 
-            # changing versions
-            WLS = 'weka local setup '
-            if self.config.weka_ver[0] == '4' and int(self.config.weka_ver[1]) >= 1:
-                WLSC = WLS + 'container'
-            else:
-                WLSC = WLS + 'host'
-
-            # create compute container
+            # create compute container(s)
             hostid=0
             for host in host_names:  # not sure
-                fp.write(f"echo Starting Compute container on host {host}" + NL)
-                fp.write(f'ssh {host} sudo ' + WLSC + ' --name compute0 --resources-path /tmp/compute0.json ' +
-                         f'--join-ips={host_ips_string} --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
+                fp.write(f'echo Starting compute container(s) on host {host}')
+                fp.write(f'ssh {host} \'cd /tmp/;'
+                         'for container_json in compute*.json; do'
+                         f'sudo {WLSC} --name "$\{container_json%.json}" '
+                         '--resources-path /tmp/"$container_json" '
+                         f'--join-ips={host_ips_string} '
+                         f'--management-ips={host_ips[hostid].replace("+", ",")}; '
+                         'done\''
+                         '')
                 hostid += 1
             # add drives
             fp.write(NL)
@@ -323,9 +345,15 @@ class WekaCluster(object):
             fp.write(NL)
             hostid=0
             for host in host_names:  # not sure
-                fp.write(f"echo Starting Front container on host {host}" + NL)
-                fp.write(f'ssh {host} sudo ' + WLSC + ' --name frontend0 --resources-path /tmp/frontend0.json ' +
-                         f'--join-ips={host_ips_string} --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
+                fp.write(f'echo Starting frontend container(s) on host {host}')
+                fp.write(f'ssh {host} \'cd /tmp/;'
+                         'for container_json in compute*.json; do'
+                         f'sudo {WLSC} --name "$\{container_json%.json}" '
+                         '--resources-path /tmp/"$container_json" '
+                         f'--join-ips={host_ips_string} '
+                         f'--management-ips={host_ips[hostid].replace("+", ",")}; '
+                         'done\''
+                         '')
                 hostid += 1
 
             fp.write(f"echo Configuration process complete" + NL)
