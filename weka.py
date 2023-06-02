@@ -283,6 +283,7 @@ class WekaHostGroup():
             self.numnets[source_interface] = set()
 
         print("Exploring network... this may take a while")
+        # set up for parallel execution
         for hostname, hostobj in candidates.items():
             log.info(f'Looking at host {hostname}...')
             # see if the reference host can talk to the target ip on each interface
@@ -294,6 +295,7 @@ class WekaHostGroup():
 
                     threaded_method(self, WekaHostGroup.ping_clients, source_interface, hostobj, targetip)
 
+        # execute them
         default_threader.run()
 
         log.debug(f"There are {len(self.accessible_hosts)} ping-able hosts")
@@ -360,8 +362,10 @@ class WekaHostGroup():
 
     def ping_clients(self, source_interface, hostobj, targetip):
         hostname = hostobj.name
+        log.debug(f"pinging from {hostname}/{source_interface} to {targetip.ip}")
         ssh_out = self.ssh_client.run(f"ping -c1 -W1 -I {source_interface} {targetip.ip}")
         if ssh_out.status == 0:
+            log.debug(f"Ping successful - adding {hostname} to accessible_hosts")
             # we were able to ping the host!  add it to the set of hosts we can access via this IF
             self.accessible_hosts[source_interface].add(hostname)
             self.pingable_ips[source_interface].append(targetip)
