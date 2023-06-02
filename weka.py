@@ -287,7 +287,7 @@ class WekaHostGroup():
         for hostname, hostobj in candidates.items():
             log.info(f'Looking at host {hostname}...')
             # see if the reference host can talk to the target ip on each interface
-            log.debug(f"refhost.nics = {self.referencehost_obj.nics.keys()}")
+            log.debug(f"refhost.nics = {list(self.referencehost_obj.nics.keys())}")
             for source_interface in self.referencehost_obj.nics.keys():
                 for targetif, targetip in hostobj.nics.items():
                     if hostname == reference_hostname and source_interface == targetif:
@@ -317,7 +317,7 @@ class WekaHostGroup():
         log.debug(f"There are {len(self.usable_hosts)} usable hosts")
         if len(self.usable_hosts) != len(self.accessible_hosts):
             diff = set(self.accessible_hosts.keys()) - set(self.usable_hosts.keys())
-            log.debug(f"Hosts dropped: {diff}")
+            log.debug(f"Hosts dropped: {list(diff)}")
 
             # are the other hosts on different subnets?
         self.isrouted = False
