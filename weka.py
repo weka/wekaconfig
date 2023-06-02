@@ -296,6 +296,8 @@ class WekaHostGroup():
 
         default_threader.run()
 
+        log.debug(f"There are {len(self.accessible_hosts)} ping-able hosts")
+
         # merge the accessible_hosts sets - we need the superset for later
         usable_set = set()  # should we really be using sets here?  A dict might work easier
         self.usable_hosts = dict()  # definitive list (well, dict) of hosts
@@ -308,7 +310,12 @@ class WekaHostGroup():
         # for some odd reason, the above ping doesn't work when loopback.  Go figure
         self.usable_hosts[self.referencehost_obj.name] = self.referencehost_obj  # he gets left out
 
-        # are the other hosts on different subnets?
+        log.debug(f"There are {len(self.usable_hosts)} usable hosts")
+        if len(self.usable_hosts) != len(self.accessible_hosts):
+            diff = set(self.accessible_hosts.keys()) - set(self.usable_hosts.keys())
+            log.debug(f"Hosts dropped: {diff}")
+
+            # are the other hosts on different subnets?
         self.isrouted = False
         for source_interface in self.referencehost_obj.nics.keys():
             if len(self.numnets[source_interface]) > 1:
@@ -362,7 +369,7 @@ class WekaHostGroup():
             if targetip.network not in self.numnets[source_interface]:
                 self.numnets[source_interface].add(targetip.network)  # note unique networks
         else:
-            log.debug(f"From {source_interface} target {hostname}-{targetip} failed.")
+            log.debug(f"From {source_interface} target {hostname}-{targetip} failed with rc={ssh_out.status}")
 
     def get_gateways(self, host, nic):
         log.info(f"probing gateway for {host}/{nic.name}")

@@ -26,11 +26,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.version:
-        print(f"{progname} version 2.1.0")
+        print(f"{progname} version 2.1.1")
         sys.exit(0)
 
+    if args.verbosity == 1:
+        weka_debug = logging.INFO
+    elif args.verbosity >= 2:
+        weka_debug = logging.DEBUG
+    else:
+        weka_debug = DEFAULT
+    register_module("weka", weka_debug)
+
     register_module("paramiko", logging.ERROR)
-    register_module("weka", DEFAULT)
     register_module("widgets", DEFAULT)
     register_module("logic", DEFAULT)
     register_module("forms", DEFAULT)
