@@ -287,12 +287,14 @@ class WekaHostGroup():
         for hostname, hostobj in candidates.items():
             log.info(f'Looking at host {hostname}...')
             # see if the reference host can talk to the target ip on each interface
+            log.debug(f"refhost.nics = {self.referencehost_obj.nics.keys()}")
             for source_interface in self.referencehost_obj.nics.keys():
                 for targetif, targetip in hostobj.nics.items():
                     if hostname == reference_hostname and source_interface == targetif:
                         self.pingable_ips[source_interface].append(targetip)
                         continue  # not sure why, but ping fails on loopback anyway
 
+                    log.debug(f"adding {hostobj.name}/{source_interface}/{targetip.ip} to list")
                     threaded_method(self, WekaHostGroup.ping_clients, source_interface, hostobj, targetip)
 
         # execute them
