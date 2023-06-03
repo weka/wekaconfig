@@ -78,51 +78,53 @@ class STEMHost(object):
         for net_adapter in self.machine_info['net']['interfaces']:
             # (bruce) change lowest allowed mtu to 1400 - we technically support 2k on ib
             # and in theory support 1500 on eth, so don't abort without options for low MTUs
-            if (1400 < net_adapter['mtu'] < 10000) and len(net_adapter['ip4']) > 0:
-                # if details['ethBondingMaster'] != '':  # what are the other values?
-                #    print(f"{name}:{net_adapter['name']}:ethBondingMaster = {details['ethBondingMaster']}")
-                #    pass
-                if net_adapter['bondType'] == 'NONE':  # "NONE", "BOND" and "SLAVE" are valid
-                    details = self.find_interface_details(net_adapter['name'])
-                elif net_adapter['bondType'] == 'BOND' or net_adapter['bondType'] == 'BOND_MLTI_NIC':
-                    details = self.find_bond_details(net_adapter['name'])
-                else:
-                    continue  # skip slaves
+            if net_adapter['mtu'] <= 1400 or net_adapter['mtu'] >= 10000:
+                log.info(
+                    f'{self.name}: Skipping {net_adapter["name"]} due to MTU {net_adapter["mtu"]} out of range')
+                continue
+            if len(net_adapter['ip4']) <= 0:
+                log.info(f'{self.name}: Skipping interface {net_adapter["name"]} - unconfigured')
+                continue
 
-                if len(net_adapter['name_slaves']) != 0:  # what are other values?
-                    log.info(f"{self.name}:{net_adapter['name']}:name_slaves = {net_adapter['name_slaves']}")
-                    pass
+            if net_adapter['bondType'] == 'SLAVE':
+                log.info(f'{self.name}: Skipping interface {net_adapter["name"]} - is a slave to a bond')
+                continue
 
-                # make sure we were able to get the details we need
+            if net_adapter['bondType'] == 'NONE':  # "NONE", "BOND" and "SLAVE" are valid
+                # a "regular" interface
+                details = self.find_interface_details(net_adapter['name'])
                 if details is None:
                     log.error(f"no details available for {net_adapter['name']} on host '{self.name}' - skipping")
                     continue
-
-                # check this way so it doesn't puke
-                val_code = details.get('validationCode', None)
-                link = details.get('linkDetected', None)
-                speed = details.get('speedMbps', None)
-
-                if val_code is None:
-                    log.error(f"val_code is None for {net_adapter['name']} on host '{self.name}' - skipping")
-                    continue
-                if link is None:
-                    log.error(f"link is None for {net_adapter['name']} on host '{self.name}' - skipping")
-                    continue
-                if speed is None:
-                    log.error(f"speed is None for {net_adapter['name']} on host '{self.name}' - skipping")
-                    continue
-                if net_adapter['mtu'] < 4000 and speed > 10000:
-                    msg = f"Host {self.name}: Net adapter {net_adapter['name']} has low mtu ({net_adapter['mtu']}). Not recommended, but continuing..."
-                    log.warning(f"* WARNING: {msg}")
-
                 if details['validationCode'] == "OK" and details['linkDetected']:
-                    self.nics[net_adapter['name']] = \
-                        WekaInterface(net_adapter['linkLayer'],
-                                      # details['interface_alias'],
-                                      net_adapter['name'],
-                                      f"{net_adapter['ip4']}/{net_adapter['ip4Netmask']}",
-                                      details['speedMbps'])
+                    self.nics[net_adapter['name']] = WekaInterface(net_adapter['linkLayer'],
+                                                                   net_adapter['name'],
+                                                                   f"{net_adapter['ip4']}/{net_adapter['ip4Netmask']}",
+                                                                   details['speedMbps'])
+                    log.info(f"{self.name}: interface {net_adapter['name']} added to config")
+            elif net_adapter['bondType'][:4] == 'BOND':  # can be "BOND_MLTI_NIC" or whatever.  Same diff to us
+                # bonds don't appear in the net_adapters... have to build it from the slaves
+                if len(net_adapter['name_slaves']) == 0:  # what are other values?
+                    log.error(f"{self.name}:{net_adapter['name']}: bond has no slaves?; skipping")
+                    continue
+                log.info(f"{self.name}:{net_adapter['name']}:name_slaves = {net_adapter['name_slaves']}")
+                # find an "up" slave, if any
+                for slave in net_adapter['name_slaves']:
+                    details = self.find_interface_details(slave)
+                    if details is None:
+                        log.error(f"no details available for {slave} on host '{self.name}' - skipping")
+                        continue
+                    if details['validationCode'] == "OK" and details['linkDetected']:
+                        log.info(f"{self.name}: {net_adapter['name']}: slave {details['ethName']} good.")
+                        self.nics[net_adapter['name']] = \
+                            WekaInterface(net_adapter['linkLayer'], net_adapter['name'],
+                                          f"{net_adapter['ip4']}/{net_adapter['ip4Netmask']}", details['speedMbps'])
+                        log.info(f"{self.name}: bond {net_adapter['name']} added to config")
+                        # we don't care about other slaves once we find a working one - they should all be the same
+                        break
+                log.error(f"{self.name}: bond {net_adapter['name']} has no up slaves - skipping")
+            else:
+                log.info(f"{self.name}:{net_adapter['name']} - unknown bond type {net_adapter['bondType']}")
 
     def find_interface_details(self, iface):
         for eth in self.machine_info['eths']:
@@ -130,11 +132,11 @@ class STEMHost(object):
                 return eth
         return None
 
-    def find_bond_details(self, iface):
-        for eth in self.machine_info['eths']:
-            if eth['ethBondingMaster'] == iface:
-                return eth
-        return None
+    #    def find_bond_details(self, iface):
+    #        for eth in self.machine_info['eths']:
+    #            if eth['ethBondingMaster'] == iface:
+    #                return eth
+    #        return None
 
     def __str__(self):
         return self.name
@@ -315,9 +317,9 @@ class WekaHostGroup():
         self.usable_hosts[self.referencehost_obj.name] = self.referencehost_obj  # he gets left out
 
         log.debug(f"There are {len(self.usable_hosts)} usable hosts")
-        if len(self.usable_hosts) != len(self.accessible_hosts):
-            diff = set(self.accessible_hosts.keys()) - set(self.usable_hosts.keys())
-            log.debug(f"Hosts dropped: {list(diff)}")
+        # if len(self.usable_hosts) != len(self.accessible_hosts):
+        #    diff = set(self.accessible_hosts.keys()) - set(self.usable_hosts.keys())
+        #    log.debug(f"Hosts dropped: {list(diff)}")
 
             # are the other hosts on different subnets?
         self.isrouted = False
@@ -356,7 +358,7 @@ class WekaHostGroup():
         for host, host_obj in sorted(self.usable_hosts.items()):
             for nicname, nic_obj in host_obj.nics.items():
                 # threaded_method(host_obj, WekaHostGroup.get_gateways, host_obj, nic_obj)
-                if nic_obj.type != "IB":   # we don't support gateways on IB
+                if nic_obj.type != "IB":  # we don't support gateways on IB
                     self.get_gateways(host_obj, nic_obj)
         # parallel(self, WekaHostGroup.get_gateways)
         # default_threader.run()
@@ -402,8 +404,8 @@ class WekaHostGroup():
                 if splitlines[1] == 'via':  # There's a gateway!
                     nic.gateway = splitlines[2]
                     return True
-
-        log.debug(f"Error executing 'ip route get' on {host}:{nic.name}:" +
+        else:
+            log.debug(f"Error executing 'ip route get' on {host}:{nic.name}:" +
                       f" return code={cmd_output.status}," +
                       f" stderr={list(cmd_output.stderr)}")
         return False
