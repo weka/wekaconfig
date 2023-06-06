@@ -6,12 +6,11 @@ import logging
 import os
 import sys
 
+from wekapyutils.wekalogging import configure_logging, register_module, DEFAULT
+
 from apps import WekaConfigApp
 from output import WekaCluster
 from weka import scan_hosts
-# from wekalogging import configure_logging
-
-from wekapyutils.wekalogging import configure_logging, register_module, DEFAULT
 
 # get root logger
 log = logging.getLogger()

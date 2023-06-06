@@ -3,7 +3,6 @@
 ################################################################################################
 
 import curses.ascii
-import math
 
 import wekatui
 
@@ -147,9 +146,21 @@ class CoresWidgetBase(WekaTitleNumeric):
         """update the parent"""
         PA = self.parent.parentApp
         PA.selected_cores.recalculate()
+
+        # update on-screen values
         self.parent.fe_cores_field.set_value(str(PA.selected_cores.fe))
         self.parent.compute_cores_field.set_value(str(PA.selected_cores.compute))
         self.parent.drives_cores_field.set_value(str(PA.selected_cores.drives))
+        #self.parent.used_cores_field.set_value(str(
+        #    PA.selected_cores.fe +
+        #    PA.selected_cores.compute +
+        #    PA.selected_cores.drives
+        #))
+        self.parent.used_cores_field.set_value(str(PA.selected_cores.used))
+        self.parent.weka_cores_field.set_value(str(PA.selected_cores.usable))
+        self.parent.os_cores_field.set_value(str(PA.selected_cores.res_os))
+        self.parent.proto_cores_field.set_value(str(PA.selected_cores.res_proto))
+        self.display()
 
     def check_value(self):
         # override me
@@ -194,15 +205,22 @@ class DrivesCoresWidget(CoresWidgetBase):
 
     def check_value(self):
         PA = self.parent.parentApp
-        if self.intval > PA.selected_cores.usable:
-            return "Cannot exceed Usable Cores"
-        elif self.intval == 0:
-            return "It is required to use at least 1 FE core"
-        elif self.intval < PA.datadrives:
-            wekatui.notify_wait(f"NOTE: It is not recommended to have fewer drive cores than there are drives")
-        elif self.intval != PA.datadrives and self.intval != PA.datadrives * 2 and self.intval != PA.datadrives * 3:
-            wekatui.notify_wait(f"NOTE: The hosts have {PA.datadrives} drives, and you have selected a configuration" +
-                                "that does not follow the best practice of 1, 2, or 3 drives per core")
+
+        #if self.intval > PA.selected_cores.usable:
+        #    return "Cannot exceed Usable Cores"
+        if self.intval == 0:
+            return "It is required to use at least 1 DRIVES core"
+        # elif self.intval < PA.selected_cores.usable:
+        #    wekatui.notify_wait(f"NOTE: It is not recommended to have fewer drive cores than there are drives")
+        # elif self.intval != PA.datadrives and self.intval != PA.datadrives * 2 and self.intval != PA.datadrives * 3:
+        #    wekatui.notify_wait(f"NOTE: The hosts have {PA.datadrives} drives, and you have selected a configuration" +
+        #                        "that does not follow the best practice of 1, 2, or 3 drives per core")
+        #elif self.intval != int(self.parent.total_drives_field.value) and \
+        #        self.intval != int(self.parent.total_drives_field.value) / 2 and \
+        #        self.intval != int(self.parent.total_drives_field.value) / 3 and \
+        #        self.intval != int(self.parent.total_drives_field.value) / 4:
+        #    wekatui.notify_wait(f"NOTE: The hosts have {PA.datadrives} drives, and you have selected a configuration" +
+        #                        "that does not follow the best practice of 1, 2, or 3 drives per core")
         self.parent.parentApp.selected_cores.drives = self.intval
         return None
 
@@ -235,10 +253,10 @@ class DataParityBase(CoresWidgetBase):
         if self.intval + PA.paritydrives == self.clustersize \
                 and self.clustersize > 5:
             wekatui.notify_wait(f"Stripe width" \
-                    + f" ({self.intval}+{PA.paritydrives}) matches cluster "
-                    + "size, forming a narrow cluster. Using a stripe width "
-                    + f"of {self.intval - 1}+{PA.paritydrives} is strongly "
-                    + "recommended instead.")
+                                + f" ({self.intval}+{PA.paritydrives}) matches cluster "
+                                + "size, forming a narrow cluster. Using a stripe width "
+                                + f"of {self.intval - 1}+{PA.paritydrives} is strongly "
+                                + "recommended instead.")
         return self._check_value()
 
     def _check_value(self):
@@ -323,6 +341,59 @@ class MiscWidget(wekatui.TitleMultiSelect):
             parent.memory_field.display()
 
 
+class BiasWidget(wekatui.TitleMultiSelect):
+    def when_value_edited(self):
+        # if 0 is in value, Enable Protocols == True
+        # if 1 is in value, Protocols are Primary == True
+        # if 2 is in value, Drives Bias == True
+        # anything not in value == False for that item
+
+        # if they set protocols are primary, ensure Protocols is set
+        if 1 in self.value and 0 not in self.value:
+            self.value.insert(0, 0)  # turn on Protocols if they select Primary
+
+        self.set_values()
+        self.display()
+
+    # make darn sure they set it properly
+    def safe_to_exit(self):
+        # when_value_editied() isn't always called...
+        if 1 in self.value and 0 not in self.value:
+            self.value.insert(0, 0)  # turn on Protocols if they select Primary
+            self.set_values()
+            self.display()
+            return False
+        else:
+            # set bias settings in parent? Or just reference the field from the other objects?
+            self.set_values()
+            self.display()
+            return True
+
+    def set_values(self, **kwargs):
+        PA = self.parent.parentApp
+        PA.selected_cores.protocols = True if 0 in self.value else False
+        PA.selected_cores.proto_primary = True if 1 in self.value else False
+        PA.selected_cores.drives_bias = True if 2 in self.value else False
+
+        # auto-calc on field exit
+        self.parent.parentApp.selected_cores.drives = self.parent.parentApp.selected_cores.num_actual_drives
+        self.parent.parentApp.selected_cores.calculate()
+
+        # reset all values when they exit this field
+        #self.parent.parentApp.selected_cores.__init__(
+        #    self.parent.parentApp.selected_cores.total,
+        #    self.parent.parentApp.selected_cores.num_actual_drives,
+        #    self.parent.parentApp.selected_cores.MCB
+        #)
+
+        # cause core re-calc and re-display of all fields
+        self.parent.fe_cores_field.set_values()
+
+        self.parent.os_cores_field.display()
+        self.parent.proto_cores_field.display()
+        self.parent.weka_cores_field.display()
+        self.parent.used_cores_field.display()
+
 # a widget for displaying how many hosts there are (read-only)
 class Hosts(wekatui.TitleMultiSelect):
     def when_value_edited(self):
@@ -362,6 +433,11 @@ class Hosts(wekatui.TitleMultiSelect):
             parent.ha_field.set_value([1])
             parent.ha_field.editable = False
         parent.ha_field.display()
+
+        if PA.Multicontainer:
+            parent.multicontainer_field.set_value([0])
+        else:
+            parent.multicontainer_field.set_value([1])
         parent.multicontainer_field.display()
         return True
 
@@ -374,6 +450,13 @@ class HighAvailability(wekatui.TitleSelectOne):
 
 
 class Multicontainer(wekatui.TitleSelectOne):
+    _contained_widgets = wekatui.CheckBox
+
+    def __init__(self, *args, **keywords):
+        super().__init__(*args, **keywords)
+
+
+class YesNoCheckBox(wekatui.TitleSelectOne):
     _contained_widgets = wekatui.CheckBox
 
     def __init__(self, *args, **keywords):

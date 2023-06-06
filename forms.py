@@ -11,7 +11,7 @@ log = getLogger(__name__)
 
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
     NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts, \
-    HighAvailability, Multicontainer, SparesWidget
+    HighAvailability, Multicontainer, SparesWidget, BiasWidget
 
 from logic import Cores
 
@@ -70,8 +70,33 @@ class SelectCoresForm(PrevDoneForm):
         self.total_cores_field = self.add(WekaTitleFixedText, label="Cores per host", entry_field_width=3)
         self.total_drives_field = self.add(WekaTitleFixedText, label="Drives per host", entry_field_width=3)
         self.num_hosts_field = self.add(WekaTitleFixedText, label="Number of hosts", entry_field_width=3)
-        self.nextrely += 2  # skip 2 lines
-        self.usable_cores_field = self.add(UsableCoresWidget, label="Total Weka Cores", entry_field_width=2)
+        self.nextrely += 1  # skip 2 lines
+        self.bias_values = [
+            "Enable Protocols",
+            "Protocols are Primary",
+            "DRIVES over COMPUTE"
+        ]
+
+        self.bias_field = self.add(BiasWidget,
+                                   scroll_exit=True,  # allow them to exit using arrow keys
+                                   use_two_lines=True,  # input fields start on 2nd line
+                                   # rely=2,  # put it high on the screen
+                                   # rely=8,  # put it high on the screen
+                                   # relx=39,  # place to the right of Networks (above)
+                                   begin_entry_at=2,  # make the list under the title
+                                   max_height=len(self.bias_values) + 1,
+                                   max_width=35,
+                                   name='Bias:',
+                                   values=self.bias_values,  # field labels
+                                   value=[]  # which are selected - set later
+                                   )
+
+        self.nextrely += 1  # skip a line
+        # self.usable_cores_field = self.add(UsableCoresWidget, label="Total Weka Cores", entry_field_width=2)
+        self.os_cores_field = self.add(WekaTitleFixedText, label="Cores for OS", entry_field_width=3)
+        self.proto_cores_field = self.add(WekaTitleFixedText, label="Cores for Protocols", entry_field_width=3)
+        self.weka_cores_field = self.add(WekaTitleFixedText, label="Usable Weka Cores", entry_field_width=3)
+        self.used_cores_field = self.add(WekaTitleFixedText, label="Used Weka Cores", entry_field_width=3)
         self.nextrely += 1  # skip a line
         self.fe_cores_field = self.add(FeCoresWidget, label="FE Cores", entry_field_width=2)
         self.drives_cores_field = self.add(DrivesCoresWidget, label="DRIVES Cores", entry_field_width=2)
@@ -79,10 +104,18 @@ class SelectCoresForm(PrevDoneForm):
         self.nextrely += 1
         self.name_field = self.add(NameWidget, label="Cluster Name", entry_field_width=32)
         self.nextrely += 1
-        self.data_field = self.add(DataWidget, label="Data Drives", entry_field_width=2)
-        self.parity_field = self.add(ParityWidget, label="Parity Drives", entry_field_width=2)
+        # self.data_field = self.add(DataWidget, label="Data Drives", entry_field_width=2)
+        # self.parity_field = self.add(ParityWidget, label="Parity Drives", entry_field_width=2)
+        # self.nextrely += 1
+        # self.spares_field = self.add(SparesWidget, label="Hot Spares", entry_field_width=2)
+        # self.nextrely += 2
+
+        # move these to the right column
+        self.data_field = self.add(DataWidget, rely=2, relx=39, label="Data Drives", entry_field_width=2)
+        self.parity_field = self.add(ParityWidget, relx=39, label="Parity Drives", entry_field_width=2)
         self.nextrely += 1
-        self.spares_field = self.add(SparesWidget, label="Hot Spares", entry_field_width=2)
+        self.spares_field = self.add(SparesWidget, relx=39, label="Hot Spares", entry_field_width=2)
+        self.nextrely += 1
 
         self.align_fields()
 
@@ -91,10 +124,12 @@ class SelectCoresForm(PrevDoneForm):
             "Auto Failure Domain",
             "Cloud Enable"
         ]
+
         self.misc_field = self.add(MiscWidget,
                                    scroll_exit=True,  # allow them to exit using arrow keys
                                    use_two_lines=True,  # input fields start on 2nd line
-                                   rely=2,  # put it high on the screen
+                                   # rely=2,  # put it high on the screen
+                                   # rely=8,  # put it high on the screen
                                    relx=39,  # place to the right of Networks (above)
                                    begin_entry_at=2,  # make the list under the title
                                    max_height=len(self.misc_values) + 1,
@@ -105,7 +140,8 @@ class SelectCoresForm(PrevDoneForm):
 
         self.memory_field = self.add(MemoryWidget,
                                      label="RAM per Host",
-                                     rely=2 + len(self.misc_values) + 2,
+                                     # rely=2 + len(self.misc_values) + 2,
+                                     rely=8 + len(self.misc_values) + 2,
                                      relx=39,
                                      entry_field_width=3)
 
@@ -118,14 +154,16 @@ class SelectCoresForm(PrevDoneForm):
         # find how long the longest label is
         longest_label = 0
         for widget in self._widgets__:
-            if wekatui.TitleText in widget.__class__.__mro__:  # is this the right type of object?
+            if wekatui.TitleMultiSelect not in widget.__class__.__mro__ and \
+                    wekatui.TitleText in widget.__class__.__mro__:  # is this the right type of object?
                 widget.label_len = len(widget.label_widget.value)
                 if widget.label_len > longest_label:
                     longest_label = widget.label_len
 
         entry_field_starts_at = longest_label + 1
         for widget in self._widgets__:
-            if wekatui.TitleText in widget.__class__.__mro__:  # is this the right type of object?
+            if wekatui.TitleMultiSelect not in widget.__class__.__mro__ and \
+                    wekatui.TitleText in widget.__class__.__mro__:  # is this the right type of object?
                 # move the label to the right so that they all end at the same spot
                 relx_delta = longest_label - widget.label_len
                 widget.set_relyx(widget.rely, widget.relx + relx_delta)
@@ -134,7 +172,8 @@ class SelectCoresForm(PrevDoneForm):
 
         # fix the field width
         for widget in self._widgets__:
-            if wekatui.TitleText in widget.__class__.__mro__:  # is this the right type of object?
+            if wekatui.TitleMultiSelect not in widget.__class__.__mro__ and \
+                        wekatui.TitleText in widget.__class__.__mro__:  # is this the right type of object?
                 widget.width = widget.text_field_begin_at + widget.entry_field_width
                 widget.entry_widget.width = widget.entry_field_width + 1
                 widget.entry_widget.request_width = widget.entry_field_width + 1
@@ -146,15 +185,19 @@ class SelectCoresForm(PrevDoneForm):
             self.num_drives = self.analyse_drives()
             PA.selected_cores = Cores(self.num_cores, self.num_drives, PA.Multicontainer)
 
-        PA.selected_cores.recalculate()  # make sure they make sense
+        PA.selected_cores.calculate()  # make sure they make sense
         # repopulate the data to make sure it's correct on the screen
         self.total_cores_field.set_value(str(self.num_cores))
         self.total_drives_field.set_value(str(self.num_drives))
         self.num_hosts_field.set_value(str(len(PA.selected_hosts)))
-        self.usable_cores_field.set_value(str(PA.selected_cores.usable))
+        #self.usable_cores_field.set_value(str(PA.selected_cores.usable))
         self.fe_cores_field.set_value(str(PA.selected_cores.fe))
         self.compute_cores_field.set_value(str(PA.selected_cores.compute))
         self.drives_cores_field.set_value(str(PA.selected_cores.drives))
+        self.used_cores_field.set_value(str(PA.selected_cores.used))
+        self.weka_cores_field.set_value(str(PA.selected_cores.usable))
+        self.os_cores_field.set_value(str(PA.selected_cores.res_os))
+        self.proto_cores_field.set_value(str(PA.selected_cores.res_proto))
 
         self.name_field.set_value(PA.clustername)
         if PA.datadrives is None \
@@ -177,7 +220,12 @@ class SelectCoresForm(PrevDoneForm):
     # save the values that are on the screen so we can repopulate it later
     def save_values(self):
         PA = self.parentApp
-        PA.selected_cores.usable = int(self.usable_cores_field.value)
+        # PA.selected_cores.usable = int(self.usable_cores_field.value)
+        PA.selected_cores.usable = int(
+            self.fe_cores_field.value +
+            self.compute_cores_field.value +
+            self.drives_cores_field.value
+        )
         PA.selected_cores.fe = int(self.fe_cores_field.value)
         PA.selected_cores.compute = int(self.compute_cores_field.value)
         PA.selected_cores.drives = int(self.drives_cores_field.value)
@@ -202,6 +250,7 @@ class SelectCoresForm(PrevDoneForm):
             PA.num_containers_per_host = 1
 
             # this happens when they hit the OK button
+
     def on_ok(self):
         # The next two lines terminate the app cleanly, so we should generate the config
         self.save_values()
@@ -230,16 +279,16 @@ class SelectCoresForm(PrevDoneForm):
         for host, cores in xref_dict["cores"].items():
             if reference_cores == 0:
                 reference_cores = cores
-                #continue
+                # continue
             else:
                 if cores != reference_cores:
                     # Error!   hosts have different number of cores!
                     errors = True
-                    #break
+                    # break
 
             if ref_threads_per_core == 0:
-                ref_threads_per_core = xref_dict["threads"][host] # should be for reference_host
-                #continue
+                ref_threads_per_core = xref_dict["threads"][host]  # should be for reference_host
+                # continue
             else:
                 if xref_dict["threads"][host] != ref_threads_per_core:
                     # Error!   hosts have different number of cores!
@@ -260,15 +309,19 @@ class SelectCoresForm(PrevDoneForm):
             num_drives[hostname] = len(self.parentApp.target_hosts.usable_hosts[hostname].drives)
 
         reference_drives = 0
-        errors = False
+        # errors = False
+        # change to whatever max drives per host (in case they are different)
         for drives in num_drives.values():
-            if reference_drives == 0:
+            if drives > reference_drives:
                 reference_drives = drives
-                continue
-            else:
-                if drives != reference_drives:
-                    errors = True
-                    break
+
+            # if reference_drives == 0:
+            #    reference_drives = drives
+            #    continue
+            # else:
+            #    if drives != reference_drives:
+            #        errors = True
+            #        break
         # if errors:
         # make noise
         # wekatui.notify_confirm("The hosts are not homogenous; they have different numbers of drives.",
@@ -329,11 +382,13 @@ class SelectHostsForm(CancelNextForm):
 
     def beforeEditing(self):
         PA = self.parentApp
+        """
         if hasattr(self, "multicontainer_field"):
             if PA.Multicontainer:
                 self.multicontainer_field.set_value([0])  # set default value to Yes.
             else:
                 self.multicontainer_field.set_value([1])  # set default value to No.
+        """
 
     def on_ok(self):
         PA = self.parentApp
@@ -358,7 +413,8 @@ class SelectHostsForm(CancelNextForm):
         else:
             PA.HighAvailability = False
 
-        if hasattr(self, "multicontainer_field") and self.multicontainer_field.value == [0]:
+        # if hasattr(self, "multicontainer_field") and self.multicontainer_field.value == [0]:
+        if self.multicontainer_field.value == [0]:
             PA.Multicontainer = True
         else:
             PA.Multicontainer = False
@@ -393,8 +449,15 @@ class SelectHostsForm(CancelNextForm):
         # make a unique list of networks
         self.nets = list()
         output = list()
+        # need to account for 2 nics on same network... self.one_network...
+        temp_list = list()
+        iface_dict = dict()
         for iface, nic in sorted(hostlist.referencehost_obj.nics.items()):
-            output.append(f"{iface}: {nic.with_prefixlen} - {nic.type}, {int(nic.speed / 1000)} Gbps, " +
+            if nic.network.exploded not in temp_list:
+                temp_list.append(nic.network.exploded)
+                iface_dict[iface] = nic
+        for iface, nic in sorted(iface_dict.items()):
+            output.append(f"{nic.network.exploded} - {nic.type}, {int(nic.speed / 1000)} Gbps, " +
                           f"{len(hostlist.accessible_hosts[iface])} hosts")
             self.nets.append(iface)
 

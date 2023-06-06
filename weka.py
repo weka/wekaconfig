@@ -1,17 +1,31 @@
 ################################################################################################
 # Weka Specific Code
 ################################################################################################
+import curses
 import ipaddress
 import sys
 from collections import OrderedDict
 from logging import getLogger
 
+from wekalib import signal_handling
 from wekalib.exceptions import LoginError, CommunicationError, NewConnectionError
 from wekalib.wekaapi import WekaApi
 from wekapyutils.sthreads import default_threader
 from wekapyutils.wekassh import RemoteServer, parallel, threaded_method
 
 log = getLogger(__name__)
+
+
+def shutdown_curses(opaque):
+    try:
+        curses.echo()
+        curses.nocbreak()
+        curses.endwin()
+    except:
+        pass
+
+
+signal_handler = signal_handling(graceful_terminate=shutdown_curses)
 
 
 class WekaInterface(ipaddress.IPv4Interface):
@@ -328,7 +342,7 @@ class WekaHostGroup():
                 if if_obj.network not in self.local_subnets:
                     self.local_subnets.append(if_obj.network)
             if len(self.local_subnets) > 1:
-                self.isrouted = True    # hmm... doesn't really mean it's routed; could be just 2 subnets
+                self.isrouted = True  # hmm... doesn't really mean it's routed; could be just 2 subnets
             else:
                 self.one_network = True
 
