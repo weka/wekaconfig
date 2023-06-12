@@ -1,7 +1,7 @@
 ################################################################################################
 # Output Utility routines
 ################################################################################################
-
+import math
 from logging import getLogger
 
 log = getLogger(__name__)
@@ -266,7 +266,7 @@ class WekaCluster(object):
                 #thishost = base + str(host.host_id) + ' ' + str(cores.usable) + ' --frontend-dedicated-cores ' + \
                 #           str(cores.fe) + ' --drives-dedicated-cores ' + str(cores.drives)
 
-                fp.write(f' --compute-dedicated-cores {cores.usable - cores.drives - cores.fe}') # needs update?
+                fp.write(f' --compute-dedicated-cores {cores.compute}')
                 fp.write(f' --drive-dedicated-cores {cores.drives}')
                 fp.write(f' --frontend-dedicated-cores {cores.fe}')
                 if hasattr(self.config, "memory"):
@@ -286,6 +286,8 @@ class WekaCluster(object):
             #fp.write("sleep 60 " + NL)
             fp.write(NL)
 
+            # should we be worried about a 2nd drives container? here...
+
             # for the remaining 'local setup container' commands, we want a comma-separated list of all host_ips
             host_ips_string = ','.join(host_ips).replace('+', ',')
 
@@ -296,13 +298,31 @@ class WekaCluster(object):
             else:
                 WLSC = WLS + 'host'
 
+            # create additional drives containers, if needed
+            for container in range(1, math.ceil(self.config.selected_cores.drives / 19)):
+                hostid = 0
+                for host in host_names:  # not sure
+                    fp.write(f"echo Starting drives container {container} on host {host}" + NL)
+                    fp.write(f'ssh {host} sudo ' + WLSC +
+                             f' --name drives{container}' +
+                             f' --resources-path /tmp/drives{container}.json' +
+                             f' --join-ips={host_ips_string}' +
+                             f' --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
+                    hostid += 1
+
             # create compute container
-            hostid=0
-            for host in host_names:  # not sure
-                fp.write(f"echo Starting Compute container on host {host}" + NL)
-                fp.write(f'ssh {host} sudo ' + WLSC + ' --name compute0 --resources-path /tmp/compute0.json ' +
-                         f'--join-ips={host_ips_string} --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
-                hostid += 1
+            for container in range(0, math.ceil(self.config.selected_cores.compute / 19)):
+                hostid = 0
+                for host in host_names:  # not sure
+                    fp.write(f"echo Starting Compute container {container} on host {host}" + NL)
+                    fp.write(f'ssh {host} sudo ' + WLSC +
+                             f' --name compute{container}' +
+                             f' --resources-path /tmp/compute{container}.json' +
+                             f' --join-ips={host_ips_string}' +
+                             f' --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
+                    hostid += 1
+
+
             # add drives
             fp.write(NL)
             for item in self._drive_add():

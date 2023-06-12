@@ -117,33 +117,33 @@ class SelectCoresForm(PrevDoneForm):
         self.spares_field = self.add(SparesWidget, relx=39, label="Hot Spares", entry_field_width=2)
         self.nextrely += 1
 
-        self.align_fields()
-
-        self.misc_values = [
-            "Dedicated",
-            "Auto Failure Domain",
-            "Cloud Enable"
-        ]
-
-        self.misc_field = self.add(MiscWidget,
-                                   scroll_exit=True,  # allow them to exit using arrow keys
-                                   use_two_lines=True,  # input fields start on 2nd line
-                                   # rely=2,  # put it high on the screen
-                                   # rely=8,  # put it high on the screen
-                                   relx=39,  # place to the right of Networks (above)
-                                   begin_entry_at=2,  # make the list under the title
-                                   max_height=len(self.misc_values) + 1,
-                                   name='Misc:',
-                                   values=self.misc_values,  # field labels
-                                   value=[]  # which are selected - set later
-                                   )
-
         self.memory_field = self.add(MemoryWidget,
                                      label="RAM per Host",
                                      # rely=2 + len(self.misc_values) + 2,
-                                     rely=8 + len(self.misc_values) + 2,
+                                     #rely=8 + len(self.misc_values) + 2,
                                      relx=39,
                                      entry_field_width=3)
+
+        self.align_fields()
+
+        #self.misc_values = [
+        #    "Dedicated",
+        #    "Auto Failure Domain",
+        #    "Cloud Enable"
+        #]
+
+        #self.misc_field = self.add(MiscWidget,
+        #                           scroll_exit=True,  # allow them to exit using arrow keys
+        #                           use_two_lines=True,  # input fields start on 2nd line
+        #                           # rely=2,  # put it high on the screen
+        #                           # rely=8,  # put it high on the screen
+        #                           relx=39,  # place to the right of Networks (above)
+        #                           begin_entry_at=2,  # make the list under the title
+        #                           max_height=len(self.misc_values) + 1,
+        #                           name='Misc:',
+        #                           values=self.misc_values,  # field labels
+        #                           value=[]  # which are selected - set later
+        #                           )
 
         # values=["01234567890123456789012345678901234567890123456789", # testing
         #        "          1         2         3         4"] ) # testing
@@ -215,7 +215,8 @@ class SelectCoresForm(PrevDoneForm):
         self.data_field.set_value(str(PA.datadrives))
         self.parity_field.set_value(str(PA.paritydrives))
         self.spares_field.set_value(str(PA.hot_spares))
-        self.misc_field.set_value(PA.misc)
+        self.memory_field.set_value(str(self.memory_field.default_value()))
+        #self.misc_field.set_value(PA.misc)
 
     # save the values that are on the screen so we can repopulate it later
     def save_values(self):
@@ -233,10 +234,13 @@ class SelectCoresForm(PrevDoneForm):
         PA.datadrives = int(self.data_field.value)
         PA.paritydrives = int(self.parity_field.value)
         PA.hot_spares = int(self.spares_field.value)
-        PA.misc = self.misc_field.value
-        PA.dedicated = True if 0 in self.misc_field.value else False
-        PA.auto_failure_domain = True if 1 in self.misc_field.value else False
-        PA.cloud_enable = True if 2 in self.misc_field.value else False
+        #PA.misc = self.misc_field.value
+        #PA.dedicated = True if 0 in self.misc_field.value else False
+        PA.dedicated = True     # vince!
+        #PA.auto_failure_domain = True if 1 in self.misc_field.value else False
+        PA.auto_failure_domain = False
+        #PA.cloud_enable = True if 2 in self.misc_field.value else False
+        PA.cloud_enable = False
         # calculate the number of containers we'll have
         if PA.Multicontainer:
             PA.num_containers_per_host = 3
@@ -403,7 +407,7 @@ class SelectHostsForm(CancelNextForm):
         # find the amount of RAM we can use...  min of all hosts in the cluster
         for host in PA.selected_hosts.values():
             try:
-                if int(host.total_ramGB) < self.min_host_ramGB:
+                if int(host.total_ramGB) < PA.min_host_ramGB:
                     PA.min_host_ramGB = int(host.total_ramGB)
             except AttributeError:  # haven't set self.min_host_ramGB yet...
                 PA.min_host_ramGB = int(host.total_ramGB)

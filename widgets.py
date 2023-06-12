@@ -147,20 +147,24 @@ class CoresWidgetBase(WekaTitleNumeric):
         PA = self.parent.parentApp
         PA.selected_cores.recalculate()
 
+        # to get all of the cores fields to display...
+        # maybe we can cycle through the self.parent.* fields, and see
+        # if they are in widget.__class__.__mro__?  ie:
+        # for widget in self._widgets__:
+        #     if CoresWidgetBase in widget.__class__.__mro__:
+        #         widget.display()
+
         # update on-screen values
         self.parent.fe_cores_field.set_value(str(PA.selected_cores.fe))
         self.parent.compute_cores_field.set_value(str(PA.selected_cores.compute))
         self.parent.drives_cores_field.set_value(str(PA.selected_cores.drives))
-        #self.parent.used_cores_field.set_value(str(
-        #    PA.selected_cores.fe +
-        #    PA.selected_cores.compute +
-        #    PA.selected_cores.drives
-        #))
+
         self.parent.used_cores_field.set_value(str(PA.selected_cores.used))
         self.parent.weka_cores_field.set_value(str(PA.selected_cores.usable))
         self.parent.os_cores_field.set_value(str(PA.selected_cores.res_os))
         self.parent.proto_cores_field.set_value(str(PA.selected_cores.res_proto))
         self.display()
+
 
     def check_value(self):
         # override me
@@ -318,12 +322,23 @@ class MemoryWidget(CoresWidgetBase):
                                            entry_field_width=entry_field_width, relx=relx, rely=rely, **keywords)
 
     def check_value(self):
-        usable_ram = self.parent.parentApp.min_host_ramGB - 20
+        usable_ram = self.default_value()
         if self.intval < 50:
             return f'{self.intval}GB, really?  How do you expect to run Weka on {self.intval}GB? Please enter a value between 50GB and {usable_ram}GB'
         if self.intval > usable_ram:
             return f'{self.intval}GB of ram is greater than the max usable of {usable_ram}GB'
         return None
+
+    def default_value(self):
+        PA = self.parent.parentApp
+        try:
+            if PA.memory == 0:
+                return PA.min_host_ramGB - 20
+            else:
+                return PA.memory
+        except:
+            PA.memory = 0
+            return PA.min_host_ramGB - 20
 
     def set_values(self):
         PA = self.parent.parentApp
@@ -387,7 +402,7 @@ class BiasWidget(wekatui.TitleMultiSelect):
         #)
 
         # cause core re-calc and re-display of all fields
-        self.parent.fe_cores_field.set_values()
+        self.parent.fe_cores_field.set_values() # part of the base class, so any one will do all
 
         self.parent.os_cores_field.display()
         self.parent.proto_cores_field.display()
