@@ -184,6 +184,7 @@ class SelectCoresForm(PrevDoneForm):
             self.num_cores = self.analyse_cores()
             self.num_drives = self.analyse_drives()
             PA.selected_cores = Cores(self.num_cores, self.num_drives, PA.Multicontainer)
+            # (total_cores, num_drives, MCB, drives_bias, protocols, proto_primary):
 
         PA.selected_cores.calculate()  # make sure they make sense
         # repopulate the data to make sure it's correct on the screen

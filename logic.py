@@ -13,9 +13,6 @@ class Cores:
         self.MCB = MCB
         self.total = total_cores
         self.num_actual_drives = num_drives
-        self.protocols = False
-        self.proto_primary = False
-        self.drives_bias = False
         self.res_os = 2  # reserved for OS
         self.res_proto = 0  # reserved for protocols
         self.fe = 2  # a reasonable default
@@ -23,8 +20,13 @@ class Cores:
         self.compute = 0    # will recalc
         self.usable = 0  # will recalc
         self.used = 0
-        self.drives_reduced = False
 
+        # set defaults for these... they are updated in the BiasWidget
+        self.protocols = False
+        self.proto_primary = False
+        self.drives_bias = False
+
+        self.calculate()
         # if self.total > 24:
         #    self.res_proto = 6  # reserved for Protocol containers
         #    self.fe = 4  # reserved for FE cores
@@ -45,46 +47,97 @@ class Cores:
         # else:
         #    self.drives = num_drives
         # self.compute = 0    # will be determined in self.recalculate()
-        self.calculate()
 
     def __str__(self):
         return (
-            f"cores: total={self.total}, usable={self.usable}, fe={self.fe}, drives={self.drives}, compute={self.compute}")
+            f"cores: usable={self.usable}/{self.fe + self.drives + self.compute}, FE={self.fe}, " +
+            f"DRIVES={self.drives}, COMPUTE={self.compute} " +
+            f"(COMPUTE:DRIVES={round(self.compute / self.drives,1)}:1) " +
+            f"(drives:DRIVES={round(self.num_actual_drives / self.drives, 1)}:1) " +
+            f"{'********' if self.usable < self.fe + self.drives + self.compute else ''}")
 
     # auto-calculate cores allocations
     def calculate(self):
-        # sanity, in case user changed the total number of cores
+        # set the number of FE cores
         if self.protocols:
             if self.proto_primary:
                 self.res_proto = 6  # if protocol is primary method, add 2 more cores
+                self.fe = 4
             else:
                 self.res_proto = 4  # reserve at least 4 cores for protocols
+                self.fe = 2
         else:
             self.res_proto = 0  # no protocols?  Don't reserve any cores
+            self.fe = 1
+
         # usable cores is the total minus reserved cores - the number of cores for fe, compute, drives
         self.usable = self.total - self.res_proto - self.res_os
+
         if not self.MCB:
             if self.usable > 19:    # single container can only have 19 cores max
                 self.usable = min(19, self.total)
             if self.drives > 8:      # SBC can't do 1:1 drives cores > 8 (not enough compute)
-                self.drives = math.ceil(self.drives/2)  # maybe should be a warning?
+                self.drives = math.floor(self.drives/2)  # maybe should be a warning?
         self.compute = self.usable - self.fe - self.drives
 
-        if self.compute > 3 * self.drives:  # too many compute cores
-            self.compute = 3 * self.drives
-        elif self.compute < 2 * self.drives:  # too few compute cores
-            self.drives = math.ceil(self.num_actual_drives / 2)
-            # self.compute = self.drives * 2
-            # if self.drives + self.compute + self.fe > self.usable:
-            #    self.drives = math.ceil(self.num_actual_drives / 3)
-            self.drives_reduced = True
-            self.calculate()  # recurse?
+        self.drives = self.num_actual_drives
+        self.compute = self.maximize_compute()
+        if self.drives + self.compute + self.fe > self.usable:  # oops - too many
+            self.drives = self.round_drives_cores(self.num_actual_drives / 2)  # 2:1
+            self.compute = self.maximize_compute()
+            if self.drives + self.compute + self.fe > self.usable:  # oops - too many
+                self.drives = self.round_drives_cores(self.num_actual_drives / 3)  # 3:1
+                self.compute = self.maximize_compute()
+                if self.drives + self.compute + self.fe > self.usable:  # oops - too many
+                    self.drives = self.round_drives_cores(self.num_actual_drives / 4)  # 4:1
+                    self.compute = self.maximize_compute()
+
+        """
+        else:
+            # compute bias
+            self.drives = self.num_actual_drives
+            self.compute = self.maximize_compute()
+            #if self.compute > 3 * self.drives:  # too many compute cores
+            #    self.compute = 3 * self.drives
+            #elif self.compute < 2 * self.drives:  # too few compute cores
+            #    self.drives = math.floor(self.num_actual_drives / 2)  # 2:1
+            #    self.compute = self.maximize_compute()
+            if self.drives + self.compute + self.fe > self.usable:  # oops - too many
+                self.drives = math.floor(self.num_actual_drives / 3)  # 3:1
+                self.compute = self.maximize_compute()
+                if self.drives + self.compute + self.fe > self.usable:  # oops - too many
+                    self.drives = math.floor(self.num_actual_drives / 4)
+                    self.compute = self.maximize_compute()
+        """
+
+        if self.drives + self.compute + self.fe > self.usable:  # oops - too many STILL
+            overage = self.drives + self.compute + self.fe - self.usable
+            self.compute -= overage
+            print('adjusted compute')
 
         self.used = self.fe + self.drives + self.compute
 
-        if self.compute < 0 or self.drives < 1:
+        if self.compute < 1 or self.drives < 1:
             # invalid specification
             self.__init__(self.total, self.num_actual_drives, self.MCB) # re-initialize
+
+    def maximize_compute(self):
+        low = self.drives * 2
+        high = self.drives * 3
+        available_compute = self.usable - self.fe - self.drives
+        if high <= available_compute:
+            return high
+        elif low <= available_compute:
+            #print(f'returning available {available_compute}')
+            return available_compute
+        # not sure what to do if low > available_compute?
+        #print('low is greater than available compute')
+        return low
+
+    def round_drives_cores(self, cores):
+        if self.drives_bias:
+            return math.ceil(cores)
+        return math.floor(cores)
 
     # re-calculate after editing (user-override)
     def recalculate(self):
@@ -136,3 +189,24 @@ def filter_hosts(network_list, host_dict):
         excluded_hosts_list.append(str(host))
 
     return included_hosts, excluded_hosts
+
+if __name__ == '__main__':
+    print("Testing...")
+
+    # (total_cores, num_drives, MCB, drives_bias):
+    drives_list = [2, 3, 6, 8, 10, 15, 16, 20]
+    #drives_list = [6]
+    #drives_list = range(1, 24)
+
+    for protocols in [True, False]:
+        for proto_primary in [True, False]:
+            if not protocols and proto_primary:
+                continue    # don't bother testing; means nothing
+            for drives_bias in [True, False]:
+                for MCB in [True, False]:
+                    for drives in drives_list:
+                        for total in [24, 32, 48, 64]:
+                            test1 = Cores(total, drives, MCB, drives_bias, protocols, proto_primary)
+                            print(f'total={total}, drives={drives}, MCB={MCB}, drives_bias={drives_bias}, '+
+                            f'protocols={protocols}, proto_primary={proto_primary}:: {test1}')
+                        print()

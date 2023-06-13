@@ -145,7 +145,7 @@ class CoresWidgetBase(WekaTitleNumeric):
     def set_values(self):
         """update the parent"""
         PA = self.parent.parentApp
-        PA.selected_cores.recalculate()
+        #PA.selected_cores.recalculate()   # maybe not a good idea to do this only here... spread out logic?
 
         # to get all of the cores fields to display...
         # maybe we can cycle through the self.parent.* fields, and see
@@ -154,12 +154,14 @@ class CoresWidgetBase(WekaTitleNumeric):
         #     if CoresWidgetBase in widget.__class__.__mro__:
         #         widget.display()
 
-        # update on-screen values
+        # update on-screen values from PA
         self.parent.fe_cores_field.set_value(str(PA.selected_cores.fe))
         self.parent.compute_cores_field.set_value(str(PA.selected_cores.compute))
         self.parent.drives_cores_field.set_value(str(PA.selected_cores.drives))
 
+        PA.selected_cores.used = PA.selected_cores.fe + PA.selected_cores.compute + PA.selected_cores.drives
         self.parent.used_cores_field.set_value(str(PA.selected_cores.used))
+        self.parent.used_cores_field.display()
         self.parent.weka_cores_field.set_value(str(PA.selected_cores.usable))
         self.parent.os_cores_field.set_value(str(PA.selected_cores.res_os))
         self.parent.proto_cores_field.set_value(str(PA.selected_cores.res_proto))
@@ -174,6 +176,7 @@ class CoresWidgetBase(WekaTitleNumeric):
 class UsableCoresWidget(CoresWidgetBase):
     """specifically for total usable cores"""
 
+    # changed to read-only display field... so this should be unused
     def check_value(self):
         PA = self.parent.parentApp
 
@@ -194,12 +197,13 @@ class UsableCoresWidget(CoresWidgetBase):
 class FeCoresWidget(CoresWidgetBase):
     """specific for FrontEnd cores"""
 
+    # check_value will not allow them to leave the field if we return not None
     def check_value(self):
         PA = self.parent.parentApp
-        if self.intval > PA.selected_cores.usable:
-            return "Cannot exceed Usable Cores"
-        elif self.intval == 0:
-            return "It is recommended to use at least 1 FE core"
+        if self.intval > PA.selected_cores.usable - 2:  # have to leave 1 compute and 1 drives core!
+            return "You must allow for at least 1 of each core type"
+        elif self.intval <= 0:
+            return "You must have at least 1 FE core"
         self.parent.parentApp.selected_cores.fe = self.intval
         return None
 
@@ -207,24 +211,15 @@ class FeCoresWidget(CoresWidgetBase):
 class DrivesCoresWidget(CoresWidgetBase):
     """specific for Drives cores"""
 
+    # check_value will not allow them to leave the field if we return not None
     def check_value(self):
         PA = self.parent.parentApp
 
-        #if self.intval > PA.selected_cores.usable:
-        #    return "Cannot exceed Usable Cores"
-        if self.intval == 0:
-            return "It is required to use at least 1 DRIVES core"
-        # elif self.intval < PA.selected_cores.usable:
-        #    wekatui.notify_wait(f"NOTE: It is not recommended to have fewer drive cores than there are drives")
-        # elif self.intval != PA.datadrives and self.intval != PA.datadrives * 2 and self.intval != PA.datadrives * 3:
-        #    wekatui.notify_wait(f"NOTE: The hosts have {PA.datadrives} drives, and you have selected a configuration" +
-        #                        "that does not follow the best practice of 1, 2, or 3 drives per core")
-        #elif self.intval != int(self.parent.total_drives_field.value) and \
-        #        self.intval != int(self.parent.total_drives_field.value) / 2 and \
-        #        self.intval != int(self.parent.total_drives_field.value) / 3 and \
-        #        self.intval != int(self.parent.total_drives_field.value) / 4:
-        #    wekatui.notify_wait(f"NOTE: The hosts have {PA.datadrives} drives, and you have selected a configuration" +
-        #                        "that does not follow the best practice of 1, 2, or 3 drives per core")
+        if self.intval > PA.selected_cores.usable - 2:  # have to leave 1 compute and 1 drives core!
+            return "You must allow for at least 1 of each core type"
+        elif self.intval <= 0:
+            return "You must have at least 1 DRIVES core"
+
         self.parent.parentApp.selected_cores.drives = self.intval
         return None
 
@@ -235,10 +230,14 @@ class ComputeCoresWidget(CoresWidgetBase):
     def check_value(self):
         PA = self.parent.parentApp
 
-        if self.intval > PA.selected_cores.usable:
-            return "Cannot exceed Usable Cores"
-        elif self.intval == 0:
-            wekatui.notify_wait("It is recommended to use at least 1 Compute core")
+        if self.intval > PA.selected_cores.usable - 2:  # have to leave 1 compute and 1 drives core!
+            return "You must allow for at least 1 of each core type"
+        elif self.intval <= 0:
+            return "You must have at least 1 COMPUTE core"
+
+        if self.intval + PA.selected_cores.fe + PA.selected_cores.drives > PA.selected_cores.usable:
+            return "Too many total cores - please re-adjust"
+
         self.parent.parentApp.selected_cores.compute = self.intval
         return None
 
@@ -317,7 +316,7 @@ class MemoryWidget(CoresWidgetBase):
 
     def __init__(self, *args, label='', entry_field_width=4, relx=0, rely=0, **keywords):
         begin_entry_at = len(label) + 2  # leave room for ": "
-        self.editable = False  # default to not editable
+        self.editable = True
         super(MemoryWidget, self).__init__(*args, label=label, begin_entry_at=begin_entry_at,
                                            entry_field_width=entry_field_width, relx=relx, rely=rely, **keywords)
 
@@ -337,12 +336,13 @@ class MemoryWidget(CoresWidgetBase):
             else:
                 return PA.memory
         except:
-            PA.memory = 0
+            PA.memory = 0   # initial value
             return PA.min_host_ramGB - 20
 
     def set_values(self):
         PA = self.parent.parentApp
         PA.memory = self.intval
+        self.display()
 
 
 class MiscWidget(wekatui.TitleMultiSelect):
@@ -394,15 +394,21 @@ class BiasWidget(wekatui.TitleMultiSelect):
         self.parent.parentApp.selected_cores.drives = self.parent.parentApp.selected_cores.num_actual_drives
         self.parent.parentApp.selected_cores.calculate()
 
-        # reset all values when they exit this field
-        #self.parent.parentApp.selected_cores.__init__(
-        #    self.parent.parentApp.selected_cores.total,
-        #    self.parent.parentApp.selected_cores.num_actual_drives,
-        #    self.parent.parentApp.selected_cores.MCB
-        #)
+        # set the memory widget
+        PA.memory = PA.min_host_ramGB - 20
+        if PA.selected_cores.protocols:
+            if not PA.selected_cores.proto_primary:
+                PA.memory -= 20     # reserve RAM for protocol
+            else:
+                PA.memory -= 60     # reserve RAM for protocol
+        self.parent.memory_field.set_value(str(PA.memory))
+        self.parent.memory_field.intval = PA.memory
+        self.parent.memory_field.display()
 
         # cause core re-calc and re-display of all fields
         self.parent.fe_cores_field.set_values() # part of the base class, so any one will do all
+        self.parent.drives_cores_field.set_values() # part of the base class, so any one will do all
+        self.parent.compute_cores_field.set_values() # part of the base class, so any one will do all
 
         self.parent.os_cores_field.display()
         self.parent.proto_cores_field.display()
