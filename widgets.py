@@ -330,14 +330,11 @@ class MemoryWidget(CoresWidgetBase):
 
     def default_value(self):
         PA = self.parent.parentApp
-        try:
-            if PA.memory == 0:
-                return PA.min_host_ramGB - 20
-            else:
-                return PA.memory
-        except:
-            PA.memory = 0   # initial value
+        if not hasattr(PA, "memory"):
+            PA.memory = 0
+        if PA.memory == 0:
             return PA.min_host_ramGB - 20
+        return PA.memory
 
     def set_values(self):
         PA = self.parent.parentApp
@@ -404,6 +401,14 @@ class BiasWidget(wekatui.TitleMultiSelect):
         self.parent.memory_field.set_value(str(PA.memory))
         self.parent.memory_field.intval = PA.memory
         self.parent.memory_field.display()
+
+        if PA.selected_cores.protocols:
+            if not PA.selected_cores.proto_primary:
+                PA.protocols_memory = 20     # reserve RAM for protocol
+            else:
+                PA.protocols_memory = 60     # reserve RAM for protocol
+        else:
+            PA.protocols_memory = None
 
         # cause core re-calc and re-display of all fields
         self.parent.fe_cores_field.set_values() # part of the base class, so any one will do all

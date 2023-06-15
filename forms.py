@@ -117,12 +117,12 @@ class SelectCoresForm(PrevDoneForm):
         self.spares_field = self.add(SparesWidget, relx=39, label="Hot Spares", entry_field_width=2)
         self.nextrely += 1
 
-        self.memory_field = self.add(MemoryWidget,
-                                     label="RAM per Host",
-                                     # rely=2 + len(self.misc_values) + 2,
-                                     #rely=8 + len(self.misc_values) + 2,
-                                     relx=39,
-                                     entry_field_width=3)
+        #self.memory_field = self.add(MemoryWidget,
+        #                             label="RAM per Host",
+        #                             # rely=2 + len(self.misc_values) + 2,
+        #                             #rely=8 + len(self.misc_values) + 2,
+        #                             relx=39,
+        #                             entry_field_width=3)
 
         self.align_fields()
 

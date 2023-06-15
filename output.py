@@ -19,7 +19,7 @@ class WekaCluster(object):
         result = 'create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips) + " -T infinite"
         return result
 
-    def _host_names(self): 	# sets what the hostids will/should be
+    def _host_names(self):  # sets what the hostids will/should be
         host_names = list()
         host_ips = list()
         hostid = 0
@@ -45,7 +45,7 @@ class WekaCluster(object):
                         continue  # not HA, but has more than one NIC on the same network
                 temp += nic.ip.exploded
                 count += 1
-            #temp += ','
+            # temp += ','
             host_ips.append(temp)
             temp = str()
         return host_names, host_ips
@@ -86,8 +86,8 @@ class WekaCluster(object):
         return result
 
     # returns a list of strings
-    def _get_nics(self, hostname):    # for MCB... need a list of nics for a host
-        #base = 'host net add '
+    def _get_nics(self, hostname):  # for MCB... need a list of nics for a host
+        # base = 'host net add '
         # host_id = 0
         result = list()
         host = self.config.selected_hosts[hostname]
@@ -99,12 +99,12 @@ class WekaCluster(object):
                     this_hosts_ifs.add(nic)
 
         for nic in sorted(list(this_hosts_ifs)):
-            #if nic.gateway is not None:
+            # if nic.gateway is not None:
             #    gateway = f"--gateway={nic.gateway}"
-            #else:
+            # else:
             #    gateway = ''
-            #thishost = f"{base} {host.host_id} {nic.name} --netmask={nic.network.prefixlen} {gateway}"
-            #fullname = f"{nic.name}/{nic.network.prefixlen}"
+            # thishost = f"{base} {host.host_id} {nic.name} --netmask={nic.network.prefixlen} {gateway}"
+            # fullname = f"{nic.name}/{nic.network.prefixlen}"
             if nic.gateway is not None:
                 fullname = f"{nic.name}/{nic.ip.exploded}/{nic.network.prefixlen}/{nic.gateway}"
             else:
@@ -234,24 +234,27 @@ class WekaCluster(object):
         WEKA = "sudo weka "
         NL = "\n"
         host_names, host_ips = self._host_names()
-        hosts_names_string = ' '.join(host_names)
-        #hosts_ips_string = ','.join(host_ips)
         create_command = WEKA_CLUSTER + 'create ' + ' '.join(host_names) + ' --host-ips=' + ','.join(host_ips) \
                          + " -T infinite" + NL
+        if self.config.weka_ver[0] == '4' and int(self.config.weka_ver[1]) >= 1:
+            CONTAINER = 'container'
+        else:
+            CONTAINER = 'host'
+
         with file as fp:
             fp.write('# /usr/bin/bash' + NL)
             fp.write(NL)
             fp.write('# NOTE this is an experimental feature, and this script may not be correct' + NL)
             fp.write('# you should manually verify that it will do what you want/expect' + NL)
             fp.write(NL)
-            #fp.write("HOSTS=" + hosts_names_string + NL)
-            #fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  scp ./resources_generator.py {}:/tmp/' + NL)
-            #fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} "weka local stop; weka local rm -f default"'
+            # fp.write("HOSTS=" + hosts_names_string + NL)
+            # fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  scp ./resources_generator.py {}:/tmp/' + NL)
+            # fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} "weka local stop; weka local rm -f default"'
             #         + NL)
-            #echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} /tmp/resources_generator.py -f --path /tmp
+            # echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} /tmp/resources_generator.py -f --path /tmp
             #      --net ens6np0 --compute-dedicated-cores 11 --drive-dedicated-cores 6 --frontend-dedicated-cores 2
             #      --compute-memory 96GiB
-            #fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} /tmp/resources_generator.py -f --path /tmp ')
+            # fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} /tmp/resources_generator.py -f --path /tmp ')
             for host in host_names:  # not sure
                 # run resources generator on each host
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
@@ -263,27 +266,31 @@ class WekaCluster(object):
                     fp.write(f" {name}")
 
                 cores = self.config.selected_cores
-                #thishost = base + str(host.host_id) + ' ' + str(cores.usable) + ' --frontend-dedicated-cores ' + \
+                # thishost = base + str(host.host_id) + ' ' + str(cores.usable) + ' --frontend-dedicated-cores ' + \
                 #           str(cores.fe) + ' --drives-dedicated-cores ' + str(cores.drives)
 
                 fp.write(f' --compute-dedicated-cores {cores.compute}')
                 fp.write(f' --drive-dedicated-cores {cores.drives}')
                 fp.write(f' --frontend-dedicated-cores {cores.fe}')
-                if hasattr(self.config, "memory"):
-                    fp.write(f' --compute-memory {self.config.memory}GiB')
+
+                ####  NO LONGER SUPPORTING THESE!
+                # if hasattr(self.config, "spare_memory"):
+                #    fp.write(f' --spare-memory {self.config.spare_memory}GiB')
+                # if hasattr(self.config, "memory"):
+                #    fp.write(f' --compute-memory {self.config.memory}GiB')
+
+                if self.config.protocols_memory is not None:
+                    fp.write(f' --protocols-memory {self.config.protocols_memory}GiB')
                 fp.write(NL)
-                # probably need to look how many containers of each type it created and note that in the host
-                # so we can be sure to 'weka local setup' all of them - not missing any
 
                 # start DRIVES container
-                fp.write(f"echo Starting Drives container on host {host}" + NL)
-                fp.write(f'ssh {host} "sudo weka local setup host --name drives0 --resources-path /tmp/drives0.json"' + NL)
-                         #'--join-ips=' + ','.join(host_ips) + NL)
+                fp.write(f"echo Starting Drives container on server {host}" + NL)
+                fp.write(
+                    f'ssh {host} "sudo weka local setup {CONTAINER} --name drives0 --resources-path /tmp/drives0.json"' + NL)
 
             # create cluster
             fp.write(NL)
             fp.write(create_command)
-            #fp.write("sleep 60 " + NL)
             fp.write(NL)
 
             # should we be worried about a 2nd drives container? here...
@@ -322,7 +329,6 @@ class WekaCluster(object):
                              f' --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
                     hostid += 1
 
-
             # add drives
             fp.write(NL)
             for item in self._drive_add():
@@ -341,7 +347,7 @@ class WekaCluster(object):
             # start-io
             # start FEs
             fp.write(NL)
-            hostid=0
+            hostid = 0
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Front container on host {host}" + NL)
                 fp.write(f'ssh {host} sudo ' + WLSC + ' --name frontend0 --resources-path /tmp/frontend0.json ' +
@@ -376,6 +382,7 @@ class WekaCluster(object):
             if name is not None:
                 fp.write(WEKA_CLUSTER + name + NL)
             fp.write(WEKA_CLUSTER + self._apply() + NL)
+            return "host apply --all --force"
             # fp.write("sleep 60\n")
             # fp.write(WEKA_CLUSTER + self._start_io() + NL) # won't start without license in 3.14+
 
