@@ -391,17 +391,6 @@ class BiasWidget(wekatui.TitleMultiSelect):
         self.parent.parentApp.selected_cores.drives = self.parent.parentApp.selected_cores.num_actual_drives
         self.parent.parentApp.selected_cores.calculate()
 
-        # set the memory widget
-        PA.memory = PA.min_host_ramGB - 20
-        if PA.selected_cores.protocols:
-            if not PA.selected_cores.proto_primary:
-                PA.memory -= 20     # reserve RAM for protocol
-            else:
-                PA.memory -= 60     # reserve RAM for protocol
-        self.parent.memory_field.set_value(str(PA.memory))
-        self.parent.memory_field.intval = PA.memory
-        self.parent.memory_field.display()
-
         if PA.selected_cores.protocols:
             if not PA.selected_cores.proto_primary:
                 PA.protocols_memory = 20     # reserve RAM for protocol

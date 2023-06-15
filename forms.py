@@ -216,7 +216,7 @@ class SelectCoresForm(PrevDoneForm):
         self.data_field.set_value(str(PA.datadrives))
         self.parity_field.set_value(str(PA.paritydrives))
         self.spares_field.set_value(str(PA.hot_spares))
-        self.memory_field.set_value(str(self.memory_field.default_value()))
+        #self.memory_field.set_value(str(self.memory_field.default_value()))
         #self.misc_field.set_value(PA.misc)
 
     # save the values that are on the screen so we can repopulate it later
