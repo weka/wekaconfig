@@ -51,9 +51,9 @@ if __name__ == '__main__':
         wd = os.path.dirname(progname)
 
     # hack for broken definition of xterm-256color
-    if os.environ["TERM"] == "xterm-256color":
-        os.environ["TERMINFO"] = f"{wd}/terminfo"  # we carry our own definition
-        print(f"Setting TERMINFO to {os.environ['TERMINFO']}")
+    os.environ["TERM"] = "xterm-256color"
+    os.environ["TERMINFO"] = f"{wd}/terminfo"  # we carry our own definition
+    print(f"Setting TERMINFO to {os.environ['TERMINFO']}")
 
     if args.host == "localhost":
         import platform
