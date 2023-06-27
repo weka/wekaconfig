@@ -6,12 +6,11 @@ import logging
 import os
 import sys
 
+from wekapyutils.wekalogging import configure_logging, register_module, DEFAULT
+
 from apps import WekaConfigApp
 from output import WekaCluster
 from weka import scan_hosts
-# from wekalogging import configure_logging
-
-from wekapyutils.wekalogging import configure_logging, register_module, DEFAULT
 
 # get root logger
 log = logging.getLogger()
@@ -26,11 +25,18 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.version:
-        print(f"{progname} version 2.1.0")
+        print(f"{progname} version 2.2.1")
         sys.exit(0)
 
+    if args.verbosity == 1:
+        weka_debug = logging.INFO
+    elif args.verbosity >= 2:
+        weka_debug = logging.DEBUG
+    else:
+        weka_debug = DEFAULT
+    register_module("weka", weka_debug)
+
     register_module("paramiko", logging.ERROR)
-    register_module("weka", DEFAULT)
     register_module("widgets", DEFAULT)
     register_module("logic", DEFAULT)
     register_module("forms", DEFAULT)
@@ -45,9 +51,9 @@ if __name__ == '__main__':
         wd = os.path.dirname(progname)
 
     # hack for broken definition of xterm-256color
-    if os.environ["TERM"] == "xterm-256color":
-        os.environ["TERMINFO"] = f"{wd}/terminfo"  # we carry our own definition
-        print(f"Setting TERMINFO to {os.environ['TERMINFO']}")
+    os.environ["TERM"] = "xterm-256color"
+    os.environ["TERMINFO"] = f"{wd}/terminfo"  # we carry our own definition
+    print(f"Setting TERMINFO to {os.environ['TERMINFO']}")
 
     if args.host == "localhost":
         import platform

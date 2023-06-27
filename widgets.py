@@ -3,7 +3,6 @@
 ################################################################################################
 
 import curses.ascii
-import math
 
 import wekatui
 
@@ -146,10 +145,28 @@ class CoresWidgetBase(WekaTitleNumeric):
     def set_values(self):
         """update the parent"""
         PA = self.parent.parentApp
-        PA.selected_cores.recalculate()
+        #PA.selected_cores.recalculate()   # maybe not a good idea to do this only here... spread out logic?
+
+        # to get all of the cores fields to display...
+        # maybe we can cycle through the self.parent.* fields, and see
+        # if they are in widget.__class__.__mro__?  ie:
+        # for widget in self._widgets__:
+        #     if CoresWidgetBase in widget.__class__.__mro__:
+        #         widget.display()
+
+        # update on-screen values from PA
         self.parent.fe_cores_field.set_value(str(PA.selected_cores.fe))
         self.parent.compute_cores_field.set_value(str(PA.selected_cores.compute))
         self.parent.drives_cores_field.set_value(str(PA.selected_cores.drives))
+
+        PA.selected_cores.used = PA.selected_cores.fe + PA.selected_cores.compute + PA.selected_cores.drives
+        self.parent.used_cores_field.set_value(str(PA.selected_cores.used))
+        self.parent.used_cores_field.display()
+        self.parent.weka_cores_field.set_value(str(PA.selected_cores.usable))
+        self.parent.os_cores_field.set_value(str(PA.selected_cores.res_os))
+        self.parent.proto_cores_field.set_value(str(PA.selected_cores.res_proto))
+        self.display()
+
 
     def check_value(self):
         # override me
@@ -159,6 +176,7 @@ class CoresWidgetBase(WekaTitleNumeric):
 class UsableCoresWidget(CoresWidgetBase):
     """specifically for total usable cores"""
 
+    # changed to read-only display field... so this should be unused
     def check_value(self):
         PA = self.parent.parentApp
 
@@ -179,12 +197,13 @@ class UsableCoresWidget(CoresWidgetBase):
 class FeCoresWidget(CoresWidgetBase):
     """specific for FrontEnd cores"""
 
+    # check_value will not allow them to leave the field if we return not None
     def check_value(self):
         PA = self.parent.parentApp
-        if self.intval > PA.selected_cores.usable:
-            return "Cannot exceed Usable Cores"
-        elif self.intval == 0:
-            return "It is recommended to use at least 1 FE core"
+        if self.intval > PA.selected_cores.usable - 2:  # have to leave 1 compute and 1 drives core!
+            return "You must allow for at least 1 of each core type"
+        elif self.intval <= 0:
+            return "You must have at least 1 FE core"
         self.parent.parentApp.selected_cores.fe = self.intval
         return None
 
@@ -192,17 +211,15 @@ class FeCoresWidget(CoresWidgetBase):
 class DrivesCoresWidget(CoresWidgetBase):
     """specific for Drives cores"""
 
+    # check_value will not allow them to leave the field if we return not None
     def check_value(self):
         PA = self.parent.parentApp
-        if self.intval > PA.selected_cores.usable:
-            return "Cannot exceed Usable Cores"
-        elif self.intval == 0:
-            return "It is required to use at least 1 FE core"
-        elif self.intval < PA.datadrives:
-            wekatui.notify_wait(f"NOTE: It is not recommended to have fewer drive cores than there are drives")
-        elif self.intval != PA.datadrives and self.intval != PA.datadrives * 2 and self.intval != PA.datadrives * 3:
-            wekatui.notify_wait(f"NOTE: The hosts have {PA.datadrives} drives, and you have selected a configuration" +
-                                "that does not follow the best practice of 1, 2, or 3 drives per core")
+
+        if self.intval > PA.selected_cores.usable - 2:  # have to leave 1 compute and 1 drives core!
+            return "You must allow for at least 1 of each core type"
+        elif self.intval <= 0:
+            return "You must have at least 1 DRIVES core"
+
         self.parent.parentApp.selected_cores.drives = self.intval
         return None
 
@@ -213,10 +230,14 @@ class ComputeCoresWidget(CoresWidgetBase):
     def check_value(self):
         PA = self.parent.parentApp
 
-        if self.intval > PA.selected_cores.usable:
-            return "Cannot exceed Usable Cores"
-        elif self.intval == 0:
-            wekatui.notify_wait("It is recommended to use at least 1 Compute core")
+        if self.intval > PA.selected_cores.usable - 2:  # have to leave 1 compute and 1 drives core!
+            return "You must allow for at least 1 of each core type"
+        elif self.intval <= 0:
+            return "You must have at least 1 COMPUTE core"
+
+        if self.intval + PA.selected_cores.fe + PA.selected_cores.drives > PA.selected_cores.usable:
+            return "Too many total cores - please re-adjust"
+
         self.parent.parentApp.selected_cores.compute = self.intval
         return None
 
@@ -235,10 +256,10 @@ class DataParityBase(CoresWidgetBase):
         if self.intval + PA.paritydrives == self.clustersize \
                 and self.clustersize > 5:
             wekatui.notify_wait(f"Stripe width" \
-                    + f" ({self.intval}+{PA.paritydrives}) matches cluster "
-                    + "size, forming a narrow cluster. Using a stripe width "
-                    + f"of {self.intval - 1}+{PA.paritydrives} is strongly "
-                    + "recommended instead.")
+                                + f" ({self.intval}+{PA.paritydrives}) matches cluster "
+                                + "size, forming a narrow cluster. Using a stripe width "
+                                + f"of {self.intval - 1}+{PA.paritydrives} is strongly "
+                                + "recommended instead.")
         return self._check_value()
 
     def _check_value(self):
@@ -295,21 +316,30 @@ class MemoryWidget(CoresWidgetBase):
 
     def __init__(self, *args, label='', entry_field_width=4, relx=0, rely=0, **keywords):
         begin_entry_at = len(label) + 2  # leave room for ": "
-        self.editable = False  # default to not editable
+        self.editable = True
         super(MemoryWidget, self).__init__(*args, label=label, begin_entry_at=begin_entry_at,
                                            entry_field_width=entry_field_width, relx=relx, rely=rely, **keywords)
 
     def check_value(self):
-        usable_ram = self.parent.parentApp.min_host_ramGB - 20
+        usable_ram = self.default_value()
         if self.intval < 50:
             return f'{self.intval}GB, really?  How do you expect to run Weka on {self.intval}GB? Please enter a value between 50GB and {usable_ram}GB'
         if self.intval > usable_ram:
             return f'{self.intval}GB of ram is greater than the max usable of {usable_ram}GB'
         return None
 
+    def default_value(self):
+        PA = self.parent.parentApp
+        if not hasattr(PA, "memory"):
+            PA.memory = 0
+        if PA.memory == 0:
+            return PA.min_host_ramGB - 20
+        return PA.memory
+
     def set_values(self):
         PA = self.parent.parentApp
         PA.memory = self.intval
+        self.display()
 
 
 class MiscWidget(wekatui.TitleMultiSelect):
@@ -322,6 +352,62 @@ class MiscWidget(wekatui.TitleMultiSelect):
             parent.memory_field.value = None
             parent.memory_field.display()
 
+
+class BiasWidget(wekatui.TitleMultiSelect):
+    def when_value_edited(self):
+        # if 0 is in value, Enable Protocols == True
+        # if 1 is in value, Protocols are Primary == True
+        # if 2 is in value, Drives Bias == True
+        # anything not in value == False for that item
+
+        # if they set protocols are primary, ensure Protocols is set
+        if 1 in self.value and 0 not in self.value:
+            self.value.insert(0, 0)  # turn on Protocols if they select Primary
+
+        self.set_values()
+        self.display()
+
+    # make darn sure they set it properly
+    def safe_to_exit(self):
+        # when_value_editied() isn't always called...
+        if 1 in self.value and 0 not in self.value:
+            self.value.insert(0, 0)  # turn on Protocols if they select Primary
+            self.set_values()
+            self.display()
+            return False
+        else:
+            # set bias settings in parent? Or just reference the field from the other objects?
+            self.set_values()
+            self.display()
+            return True
+
+    def set_values(self, **kwargs):
+        PA = self.parent.parentApp
+        PA.selected_cores.protocols = True if 0 in self.value else False
+        PA.selected_cores.proto_primary = True if 1 in self.value else False
+        PA.selected_cores.drives_bias = True if 2 in self.value else False
+
+        # auto-calc on field exit
+        self.parent.parentApp.selected_cores.drives = self.parent.parentApp.selected_cores.num_actual_drives
+        self.parent.parentApp.selected_cores.calculate()
+
+        if PA.selected_cores.protocols:
+            if not PA.selected_cores.proto_primary:
+                PA.protocols_memory = 20     # reserve RAM for protocol
+            else:
+                PA.protocols_memory = 60     # reserve RAM for protocol
+        else:
+            PA.protocols_memory = None
+
+        # cause core re-calc and re-display of all fields
+        self.parent.fe_cores_field.set_values() # part of the base class, so any one will do all
+        self.parent.drives_cores_field.set_values() # part of the base class, so any one will do all
+        self.parent.compute_cores_field.set_values() # part of the base class, so any one will do all
+
+        self.parent.os_cores_field.display()
+        self.parent.proto_cores_field.display()
+        self.parent.weka_cores_field.display()
+        self.parent.used_cores_field.display()
 
 # a widget for displaying how many hosts there are (read-only)
 class Hosts(wekatui.TitleMultiSelect):
@@ -355,13 +441,19 @@ class Hosts(wekatui.TitleMultiSelect):
             # they didn't select any
             wekatui.notify_wait("You must select at least 5 hosts", title='ERROR')
             return False
-        if len(PA.selected_dps) > 1:
+        # needs to be nics on the reference host > 1
+        if len(PA.selected_dps) > 1 or PA.one_net_multi_nic:
             parent.ha_field.set_value([0])
             parent.ha_field.editable = True
         else:
             parent.ha_field.set_value([1])
             parent.ha_field.editable = False
         parent.ha_field.display()
+
+        if PA.Multicontainer:
+            parent.multicontainer_field.set_value([0])
+        else:
+            parent.multicontainer_field.set_value([1])
         parent.multicontainer_field.display()
         return True
 
@@ -380,6 +472,13 @@ class Multicontainer(wekatui.TitleSelectOne):
         super().__init__(*args, **keywords)
 
 
+class YesNoCheckBox(wekatui.TitleSelectOne):
+    _contained_widgets = wekatui.CheckBox
+
+    def __init__(self, *args, **keywords):
+        super().__init__(*args, **keywords)
+
+
 # a widget for selecting what the dataplane networks are
 class Networks(wekatui.TitleMultiSelect):
     def when_value_edited(self):
@@ -388,8 +487,18 @@ class Networks(wekatui.TitleMultiSelect):
         PA.possible_hosts = set()
         for index in self.parent.dataplane_networks_field.value:
             # save the IPv4Network objects corresponding to the selected items
-            PA.possible_hosts |= PA.target_hosts.accessible_hosts[self.parent.nets[index]]
-            PA.selected_dps.append(self.parent.nets[index])  # ie: "ib0" ?network number?
+            #  find hosts on this network...
+            for iface, nic in PA.target_hosts.referencehost_obj.nics.items():
+                if nic.network == PA.nets[index]:   # is this nic on that network?
+                    PA.possible_hosts |= PA.target_hosts.accessible_hosts[nic.name]
+                    #for host in PA.target_hosts.accessible_hosts[nic.name]:
+                    #    for nic in host.nics:
+                    #        if nic.network == network:
+                    #            PA.possible_hosts |= host.hostname
+                    #            break
+
+            #PA.possible_hosts |= PA.target_hosts.accessible_hosts[PA.nets[index]]
+            PA.selected_dps.append(PA.nets[index])  # ie: "ib0" ?network number?
 
         PA.sorted_hosts = sorted(list(PA.possible_hosts))  # sorted hostnames
         PA.hosts_value = list(range(0, len(PA.sorted_hosts)))  # show all of them pre-selected
