@@ -28,16 +28,22 @@ class WekaCluster(object):
             host.host_id = hostid
             hostid += 1
 
-            this_hosts_ifs = set()
+            host.this_hosts_ifs = set()
             count = 0
-            for interface in self.config.selected_dps:
-                iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
-                for host_int, nic in host.nics.items():
-                    if nic in iplist:
-                        this_hosts_ifs.add(nic)
+            # select the interfaces that are on the selected networks
+            for name, iface in host.nics.items():
+                if iface.network in self.config.selected_dps:
+                    if iface in self.config.target_hosts.pingable_ips[name]:  # list of ips accessible via the interface
+                        host.this_hosts_ifs.add(iface)
+
+            #for interface in self.config.selected_dps:
+            #    iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
+            #    for host_int, nic in host.nics.items():
+            #        if nic in iplist:
+            #            this_hosts_ifs.add(nic)
 
             temp = str()
-            for nic in this_hosts_ifs:
+            for nic in host.this_hosts_ifs:
                 if count > 0:
                     if self.config.HighAvailability:
                         temp += '+'
@@ -91,14 +97,20 @@ class WekaCluster(object):
         # host_id = 0
         result = list()
         host = self.config.selected_hosts[hostname]
-        this_hosts_ifs = set()
-        for interface in self.config.selected_dps:
-            iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
-            for host_int, nic in host.nics.items():
-                if nic in iplist:
-                    this_hosts_ifs.add(nic)
+        #this_hosts_ifs = set()
+        # a dp may have multiple interfaces on it
 
-        for nic in sorted(list(this_hosts_ifs)):
+        #for host_int, nic in host.nics.items():
+        #    if nic.network in self.config.selected_dps and nic.ip in self.config.target_hosts.pingable_ips:
+        #        this_hosts_ifs.add(nic)
+
+        #for interface in self.config.selected_dps:
+        #    iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
+        #    for host_int, nic in host.nics.items():
+        #        if nic in iplist:
+        #            this_hosts_ifs.add(nic)
+
+        for nic in sorted(list(host.this_hosts_ifs)):
             # if nic.gateway is not None:
             #    gateway = f"--gateway={nic.gateway}"
             # else:

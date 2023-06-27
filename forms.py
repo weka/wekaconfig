@@ -452,7 +452,9 @@ class SelectHostsForm(CancelNextForm):
 
     def guess_networks(self, hostlist):
         # make a unique list of networks
-        self.nets = list()
+        PA = self.parentApp
+        PA.nets = list()
+        PA.one_net_multi_nic = False
         output = list()
         # need to account for 2 nics on same network... self.one_network...
         temp_list = list()
@@ -461,9 +463,11 @@ class SelectHostsForm(CancelNextForm):
             if nic.network.exploded not in temp_list:
                 temp_list.append(nic.network.exploded)
                 iface_dict[iface] = nic
+            else:
+                PA.one_net_multi_nic = True
         for iface, nic in sorted(iface_dict.items()):
             output.append(f"{nic.network.exploded} - {nic.type}, {int(nic.speed / 1000)} Gbps, " +
                           f"{len(hostlist.accessible_hosts[iface])} hosts")
-            self.nets.append(iface)
+            PA.nets.append(nic.network)
 
         return output

@@ -441,7 +441,8 @@ class Hosts(wekatui.TitleMultiSelect):
             # they didn't select any
             wekatui.notify_wait("You must select at least 5 hosts", title='ERROR')
             return False
-        if len(PA.selected_dps) > 1:
+        # needs to be nics on the reference host > 1
+        if len(PA.selected_dps) > 1 or PA.one_net_multi_nic:
             parent.ha_field.set_value([0])
             parent.ha_field.editable = True
         else:
@@ -486,8 +487,18 @@ class Networks(wekatui.TitleMultiSelect):
         PA.possible_hosts = set()
         for index in self.parent.dataplane_networks_field.value:
             # save the IPv4Network objects corresponding to the selected items
-            PA.possible_hosts |= PA.target_hosts.accessible_hosts[self.parent.nets[index]]
-            PA.selected_dps.append(self.parent.nets[index])  # ie: "ib0" ?network number?
+            #  find hosts on this network...
+            for iface, nic in PA.target_hosts.referencehost_obj.nics.items():
+                if nic.network == PA.nets[index]:   # is this nic on that network?
+                    PA.possible_hosts |= PA.target_hosts.accessible_hosts[nic.name]
+                    #for host in PA.target_hosts.accessible_hosts[nic.name]:
+                    #    for nic in host.nics:
+                    #        if nic.network == network:
+                    #            PA.possible_hosts |= host.hostname
+                    #            break
+
+            #PA.possible_hosts |= PA.target_hosts.accessible_hosts[PA.nets[index]]
+            PA.selected_dps.append(PA.nets[index])  # ie: "ib0" ?network number?
 
         PA.sorted_hosts = sorted(list(PA.possible_hosts))  # sorted hostnames
         PA.hosts_value = list(range(0, len(PA.sorted_hosts)))  # show all of them pre-selected
