@@ -130,14 +130,14 @@ class WekaCluster(object):
         # host_id = 0
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
-            this_hosts_ifs = set()
-            for interface in self.config.selected_dps:
-                iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
-                for host_int, nic in host.nics.items():
-                    if nic in iplist:
-                        this_hosts_ifs.add(nic)
+            #this_hosts_ifs = set()
+            #for interface in self.config.selected_dps:
+            #    iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
+            #    for host_int, nic in host.nics.items():
+            #        if nic in iplist:
+            #            this_hosts_ifs.add(nic)
 
-            for nic in sorted(list(this_hosts_ifs)):
+            for nic in sorted(list(host.this_hosts_ifs)):
                 if nic.gateway is not None:
                     gateway = f"--gateway={nic.gateway}"
                 else:
@@ -166,7 +166,7 @@ class WekaCluster(object):
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
             cores = self.config.selected_cores
-            thishost = base + str(host.host_id) + ' ' + str(cores.usable) + ' --frontend-dedicated-cores ' + \
+            thishost = base + str(host.host_id) + ' ' + str(cores.fe + cores.drives + cores.compute) + ' --frontend-dedicated-cores ' + \
                        str(cores.fe) + ' --drives-dedicated-cores ' + str(cores.drives)
             # host_id += 1
             result.append(thishost)
