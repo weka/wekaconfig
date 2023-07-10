@@ -25,7 +25,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.version:
-        print(f"{progname} version 2.3.0")
+        print(f"{progname} version 2.3.1")
         sys.exit(0)
 
     if args.verbosity == 1:
