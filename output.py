@@ -296,6 +296,7 @@ class WekaCluster(object):
                 fp.write(PARA + f'scp -p ./resources_generator.py {host}:/tmp/' + NL)
                 fp.write(PARA + f'ssh {host} "sudo weka local stop; sudo weka local rm -f default"' + NL)
 
+            fp.write(NL + 'wait' + NL)
             for host in host_names:
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
                 fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
@@ -313,7 +314,10 @@ class WekaCluster(object):
                     fp.write(f' --protocols-memory {self.config.protocols_memory}GiB')
                 fp.write(NL)
 
-                # start DRIVES container
+            fp.write('wait' + NL)
+
+            # start DRIVES container
+            for host in host_names:
                 fp.write(f"echo Starting Drives container on server {host}" + NL)
                 fp.write(PARA + f'ssh {host} "sudo weka local setup {CONTAINER}' +
                          f' --name drives0 --resources-path /tmp/drives0.json"' + NL)
@@ -324,7 +328,7 @@ class WekaCluster(object):
             # create cluster
             fp.write(NL)
             fp.write(create_command)
-            fp.write(NL)
+            #fp.write(NL)
 
             # for the remaining 'local setup container' commands, we want a comma-separated list of all host_ips
             host_ips_string = ','.join(host_ips).replace('+', ',')
@@ -348,8 +352,8 @@ class WekaCluster(object):
                              f' --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
                     hostid += 1
 
-            # wait for parallel commands to finish
-            fp.write(NL + 'wait' + NL)
+                # wait for parallel commands to finish
+                fp.write('wait' + NL)
 
             # create compute container
             for container in range(0, math.ceil(self.config.selected_cores.compute / 19)):
@@ -364,7 +368,7 @@ class WekaCluster(object):
                     hostid += 1
 
             # wait for parallel commands to finish
-            fp.write(NL + 'wait' + NL)
+            fp.write('wait' + NL)
 
             # add drives
             fp.write(NL)

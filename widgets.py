@@ -302,8 +302,10 @@ class SparesWidget(DataParityBase):
 
     def _check_value(self):
         PA = self.parent.parentApp
-        if self.intval not in range(0, PA.datadrives - 2):
-            return f"Hot Spares must be between 0 and {PA.datadrives - 3}"
+        stripe_width = PA.datadrives + PA.paritydrives
+        max_spares = self.clustersize - stripe_width
+        if self.intval > max_spares:
+            return f"Hot Spares must be between 0 and {max_spares}"
         return None
 
     def set_values(self):
