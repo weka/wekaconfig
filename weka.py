@@ -271,11 +271,11 @@ class WekaHostGroup():
             if candidate.machine_info is None:
                 log.error(f"Error communicating with {host} - removing from list")
                 del candidates[host]  # remove it from the list
-            if candidate.version != self.referencehost_obj.version:
+            elif candidate.version != self.referencehost_obj.version:
                 log.info(f"    host {host} is not running v{self.referencehost_obj.version} - removing from list")
                 del candidates[host]
-                continue
-            log.info(f"Host {host} added to list of cluster hosts")
+            else:
+                log.info(f"Host {host} added to list of cluster hosts")
 
         log.info("Preparing to explore network...")
         self.ssh_client = RemoteServer(self.reference_hostname)
