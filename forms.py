@@ -10,7 +10,7 @@ import wekatui
 log = getLogger(__name__)
 
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
-    NameWidget, DataWidget, ParityWidget, MiscWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts, \
+    NameWidget, DataWidget, ParityWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts, \
     HighAvailability, Multicontainer, SparesWidget, BiasWidget
 
 from logic import Cores
@@ -117,12 +117,10 @@ class SelectCoresForm(PrevDoneForm):
         self.spares_field = self.add(SparesWidget, relx=39, label="Hot Spares", entry_field_width=2)
         self.nextrely += 1
 
-        #self.memory_field = self.add(MemoryWidget,
-        #                             label="RAM per Host",
-        #                             # rely=2 + len(self.misc_values) + 2,
-        #                             #rely=8 + len(self.misc_values) + 2,
-        #                             relx=39,
-        #                             entry_field_width=3)
+        self.memory_field = self.add(MemoryWidget,
+                                     label="Reserved RAM per Host",
+                                     relx=39,
+                                     entry_field_width=3)
 
         self.align_fields()
 
@@ -217,6 +215,9 @@ class SelectCoresForm(PrevDoneForm):
         self.parity_field.set_value(str(PA.paritydrives))
         self.spares_field.set_value(str(PA.hot_spares))
         #self.memory_field.set_value(str(self.memory_field.default_value()))
+        if PA.protocols_memory is None:
+            PA.protocols_memory = 0
+        self.memory_field.set_value(str(PA.protocols_memory))
         #self.misc_field.set_value(PA.misc)
 
     # save the values that are on the screen so we can repopulate it later
@@ -235,6 +236,7 @@ class SelectCoresForm(PrevDoneForm):
         PA.datadrives = int(self.data_field.value)
         PA.paritydrives = int(self.parity_field.value)
         PA.hot_spares = int(self.spares_field.value)
+        PA.protocols_memory = int(self.memory_field.value)
         #PA.misc = self.misc_field.value
         #PA.dedicated = True if 0 in self.misc_field.value else False
         PA.dedicated = True     # vince!
@@ -380,7 +382,7 @@ class SelectHostsForm(CancelNextForm):
                                  values=["Yes", "No"])
         self.multicontainer_field = self.add(Multicontainer, name="Multicontainer:",
                                              scroll_exit=True,  # allow them to exit using arrow keys
-                                             rely=12, relx=41,
+                                             rely=13, relx=41,
                                              use_two_lines=True, editable=True,
                                              begin_entry_at=2,  # make the list under the title
                                              values=["Yes", "No"])
