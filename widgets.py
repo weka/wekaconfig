@@ -301,9 +301,13 @@ class SparesWidget(DataParityBase):
     """specific for data drives input"""
 
     def _check_value(self):
-        PA = self.parent.parentApp
-        if self.intval not in range(0, PA.datadrives - 2):
-            return f"Hot Spares must be between 0 and {PA.datadrives - 3}"
+        #PA = self.parent.parentApp
+        #stripe_width = PA.datadrives + PA.paritydrives
+        #max_spares = self.clustersize - stripe_width
+        #if self.intval > max_spares:
+        #    return f"Hot Spares must be between 0 and {max_spares}"
+        if self.intval >= self.clustersize or self.intval < 0:
+            return f"Hot Spares out of range"
         return None
 
     def set_values(self):
@@ -321,36 +325,37 @@ class MemoryWidget(CoresWidgetBase):
                                            entry_field_width=entry_field_width, relx=relx, rely=rely, **keywords)
 
     def check_value(self):
-        usable_ram = self.default_value()
-        if self.intval < 50:
-            return f'{self.intval}GB, really?  How do you expect to run Weka on {self.intval}GB? Please enter a value between 50GB and {usable_ram}GB'
-        if self.intval > usable_ram:
-            return f'{self.intval}GB of ram is greater than the max usable of {usable_ram}GB'
+        PA = self.parent.parentApp
+        #usable_ram = self.default_value()
+        #if self.intval < 50:
+        #    return f'{self.intval}GB, really?  How do you expect to run Weka on {self.intval}GB? Please enter a value between 50GB and {usable_ram}GB'
+        if self.intval > PA.min_host_ramGB:
+            return f'{self.intval}GB of ram is greater than the max usable of {PA.min_host_ramGB}GB'
+        PA.protocols_memory = str(self.intval)
         return None
 
-    def default_value(self):
-        PA = self.parent.parentApp
-        if not hasattr(PA, "memory"):
-            PA.memory = 0
-        if PA.memory == 0:
-            return PA.min_host_ramGB - 20
-        return PA.memory
+    #def default_value(self):
+    #    PA = self.parent.parentApp
+    #    if not hasattr(PA, "protocols_memory"):
+    #        PA.protocols_memory = 0
+    #    return PA.protocols_memory
 
     def set_values(self):
         PA = self.parent.parentApp
-        PA.memory = self.intval
+        #PA.protocols_memory = self.intval
+        self.set_value(str(PA.protocols_memory))
         self.display()
 
 
-class MiscWidget(wekatui.TitleMultiSelect):
-    def when_value_edited(self):
-        parent = self.parent
-        if 0 not in self.value:
-            parent.memory_field.editable = True
-        else:
-            parent.memory_field.editable = False
-            parent.memory_field.value = None
-            parent.memory_field.display()
+#class MiscWidget(wekatui.TitleMultiSelect):
+#    def when_value_edited(self):
+#        parent = self.parent
+#        if 0 not in self.value:
+#            parent.memory_field.editable = True
+#        else:
+#            parent.memory_field.editable = False
+#            parent.memory_field.value = None
+#            parent.memory_field.display()
 
 
 class BiasWidget(wekatui.TitleMultiSelect):
@@ -397,12 +402,13 @@ class BiasWidget(wekatui.TitleMultiSelect):
             else:
                 PA.protocols_memory = 60     # reserve RAM for protocol
         else:
-            PA.protocols_memory = None
+            PA.protocols_memory = 0
 
         # cause core re-calc and re-display of all fields
         self.parent.fe_cores_field.set_values() # part of the base class, so any one will do all
         self.parent.drives_cores_field.set_values() # part of the base class, so any one will do all
         self.parent.compute_cores_field.set_values() # part of the base class, so any one will do all
+        self.parent.memory_field.set_values()
 
         self.parent.os_cores_field.display()
         self.parent.proto_cores_field.display()

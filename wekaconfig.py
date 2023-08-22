@@ -25,7 +25,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.version:
-        print(f"{progname} version 2.2.1")
+        print(f"{progname} version 2.3.5")
         sys.exit(0)
 
     if args.verbosity == 1:
@@ -76,15 +76,9 @@ if __name__ == '__main__':
     if not config.cleanexit:
         print("App was cancelled.")
     else:
-        print(f"App exited - writing config.txt")
-        # print(f"target hosts = {config.target_hosts}")
-        # print(f"nets = {config.selected_dps}")
-        # print(f"hosts = {config.selected_hosts}")
-        # print(f"cores = {config.selected_cores}")
-        # print(f"name = {config.clustername}")
-        # print(f"datadrives = {config.datadrives}")
-        # print(f"parity = {config.paritydrives}")
+        print(f"App exited - writing config.sh")
 
         cluster = WekaCluster(config)
-        fo = open("config.txt", "w")
+        fo = open("config.sh", "w")
         cluster.cluster_config(fo)
+        os.chmod("config.sh", 0o755)

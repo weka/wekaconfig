@@ -271,11 +271,11 @@ class WekaHostGroup():
             if candidate.machine_info is None:
                 log.error(f"Error communicating with {host} - removing from list")
                 del candidates[host]  # remove it from the list
-            if candidate.version != self.referencehost_obj.version:
+            elif candidate.version != self.referencehost_obj.version:
                 log.info(f"    host {host} is not running v{self.referencehost_obj.version} - removing from list")
                 del candidates[host]
-                continue
-            log.info(f"Host {host} added to list of cluster hosts")
+            else:
+                log.info(f"Host {host} added to list of cluster hosts")
 
         log.info("Preparing to explore network...")
         self.ssh_client = RemoteServer(self.reference_hostname)
@@ -517,12 +517,17 @@ class WekaHostGroup():
         default_threader.run()
 
         for host, host_obj in self.usable_hosts.items():
-            threads = host_obj.lscpu_data.get('Thread(s) per core', '')
-            host_obj.hyperthread = False if threads == '1' else True
-            host_obj.threads_per_core = int(threads)
-            log.debug(f"{host} hyperthreading/SMT is {host_obj.hyperthread}")
+            if 'Thread(s) per core' in host_obj.lscpu_data:
+                threads = host_obj.lscpu_data.get('Thread(s) per core', '0')
+                host_obj.hyperthread = False if threads == '1' else True
+                host_obj.threads_per_core = int(threads)
+                if host_obj.threads_per_core == 0:
+                    log.error(f"Host {host}: Unable to parse lscpu output -TPC=0")
+                else:
+                    log.debug(f"{host} hyperthreading/SMT is {host_obj.hyperthread}")
+            else:
+                log.error(f"Host {host}: Unable to parse lscpu output - TPC not found")
 
-        pass
 
     def lscpu(self, hostobj):
         hostobj.lscpu_data = dict()
@@ -535,7 +540,9 @@ class WekaHostGroup():
                 for line in outputlines:
                     splitlines = line.split(':')
                     if len(splitlines) > 1:
-                        hostobj.lscpu_data[splitlines[0]] = splitlines[1].strip()
+                        hostobj.lscpu_data[splitlines[0].strip()] = splitlines[1].strip()
+            else:
+                log.error(f"Host {hostobj.name}: Unable to parse lscpu output - no lines")
 
         else:
             log.error(f"lscpu failed on {hostobj.name}")

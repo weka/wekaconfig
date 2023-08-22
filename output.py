@@ -6,6 +6,41 @@ from logging import getLogger
 
 log = getLogger(__name__)
 
+SCRIPT_PREAMBLE = """#!/bin/bash
+
+usage() {
+	echo "Usage: $0 [--no-parallel]"
+	echo "  Use --no-parallel to prevent parallel execution"
+	exit 1
+}
+
+para() {
+	TF=$1; shift
+	echo $*
+	$* &
+	#[ !$TF ] && { echo para waiting; wait; }
+	[ $TF == "FALSE" ] && { echo para waiting; wait; }
+}
+
+PARA="TRUE"
+
+# parse args
+if [ $# != 0 ]; then
+	if [ $# != 1 ]; then
+		usage
+	elif [ $1 == "--no-parallel" ]; then
+		PARA="FALSE"
+	else
+		echo "Error: unknown command line switch - $1"
+		usage
+	fi
+fi
+
+echo starting - PARA is $PARA
+
+# ------------------ custom script below --------------
+"""
+PARA = 'para ${PARA} '
 
 class WekaCluster(object):
     def __init__(self, config):
@@ -254,58 +289,46 @@ class WekaCluster(object):
             CONTAINER = 'host'
 
         with file as fp:
-            fp.write('# /usr/bin/bash' + NL)
-            fp.write(NL)
-            fp.write('# NOTE this is an experimental feature, and this script may not be correct' + NL)
-            fp.write('# you should manually verify that it will do what you want/expect' + NL)
-            fp.write(NL)
-            # fp.write("HOSTS=" + hosts_names_string + NL)
-            # fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  scp ./resources_generator.py {}:/tmp/' + NL)
-            # fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} "weka local stop; weka local rm -f default"'
-            #         + NL)
-            # echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} /tmp/resources_generator.py -f --path /tmp
-            #      --net ens6np0 --compute-dedicated-cores 11 --drive-dedicated-cores 6 --frontend-dedicated-cores 2
-            #      --compute-memory 96GiB
-            # fp.write('echo $HOSTS |tr " " "\n" | xargs -P8 -I{}  ssh {} /tmp/resources_generator.py -f --path /tmp ')
-            for host in host_names:  # not sure
-                # run resources generator on each host
+            fp.write(SCRIPT_PREAMBLE + NL)
+
+            for host in host_names:
+                fp.write(f"echo Stopping weka on {host}" + NL)
+                fp.write(PARA + f'scp -p ./resources_generator.py {host}:/tmp/' + NL)
+                fp.write(PARA + f'ssh {host} "sudo weka local stop; sudo weka local rm -f default"' + NL)
+
+            fp.write(NL + 'wait' + NL)
+            for host in host_names:
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
-                fp.write(f'scp -p ./resources_generator.py {host}:/tmp/' + NL)
-                fp.write(f'ssh {host} "sudo weka local stop; sudo weka local rm -f default"' + NL)
-                fp.write(f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
+                fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
                 net_names = self._get_nics(host)
                 for name in net_names:
                     fp.write(f" {name}")
 
                 cores = self.config.selected_cores
-                # thishost = base + str(host.host_id) + ' ' + str(cores.usable) + ' --frontend-dedicated-cores ' + \
-                #           str(cores.fe) + ' --drives-dedicated-cores ' + str(cores.drives)
 
                 fp.write(f' --compute-dedicated-cores {cores.compute}')
                 fp.write(f' --drive-dedicated-cores {cores.drives}')
                 fp.write(f' --frontend-dedicated-cores {cores.fe}')
 
-                ####  NO LONGER SUPPORTING THESE!
-                # if hasattr(self.config, "spare_memory"):
-                #    fp.write(f' --spare-memory {self.config.spare_memory}GiB')
-                # if hasattr(self.config, "memory"):
-                #    fp.write(f' --compute-memory {self.config.memory}GiB')
-
                 if self.config.protocols_memory is not None:
                     fp.write(f' --protocols-memory {self.config.protocols_memory}GiB')
                 fp.write(NL)
 
-                # start DRIVES container
+            fp.write('wait' + NL)
+
+            # start DRIVES container
+            for host in host_names:
                 fp.write(f"echo Starting Drives container on server {host}" + NL)
-                fp.write(
-                    f'ssh {host} "sudo weka local setup {CONTAINER} --name drives0 --resources-path /tmp/drives0.json"' + NL)
+                fp.write(PARA + f'ssh {host} "sudo weka local setup {CONTAINER}' +
+                         f' --name drives0 --resources-path /tmp/drives0.json"' + NL)
+
+            # wait for parallel commands to finish
+            fp.write(NL + 'wait' + NL)
 
             # create cluster
             fp.write(NL)
             fp.write(create_command)
-            fp.write(NL)
-
-            # should we be worried about a 2nd drives container? here...
+            #fp.write(NL)
 
             # for the remaining 'local setup container' commands, we want a comma-separated list of all host_ips
             host_ips_string = ','.join(host_ips).replace('+', ',')
@@ -322,30 +345,39 @@ class WekaCluster(object):
                 hostid = 0
                 for host in host_names:  # not sure
                     fp.write(f"echo Starting drives container {container} on host {host}" + NL)
-                    fp.write(f'ssh {host} sudo ' + WLSC +
+                    fp.write(PARA + f'ssh {host} sudo ' + WLSC +
                              f' --name drives{container}' +
                              f' --resources-path /tmp/drives{container}.json' +
                              f' --join-ips={host_ips_string}' +
                              f' --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
                     hostid += 1
 
+                # wait for parallel commands to finish
+                fp.write('wait' + NL)
+
             # create compute container
             for container in range(0, math.ceil(self.config.selected_cores.compute / 19)):
                 hostid = 0
                 for host in host_names:  # not sure
                     fp.write(f"echo Starting Compute container {container} on host {host}" + NL)
-                    fp.write(f'ssh {host} sudo ' + WLSC +
+                    fp.write(PARA + f'ssh {host} sudo ' + WLSC +
                              f' --name compute{container}' +
                              f' --resources-path /tmp/compute{container}.json' +
                              f' --join-ips={host_ips_string}' +
                              f' --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
                     hostid += 1
 
+            # wait for parallel commands to finish
+            fp.write('wait' + NL)
+
             # add drives
             fp.write(NL)
             for item in self._drive_add():
-                fp.write(WEKA_CLUSTER + item + NL)
+                fp.write(PARA + WEKA_CLUSTER + item + NL)
             fp.write(NL)
+
+            # wait for parallel commands to finish
+            fp.write(NL + 'wait' + NL)
 
             fp.write(WEKA_CLUSTER + self._parity() + NL)
             fp.write(WEKA_CLUSTER + self._hot_spare() + NL)
@@ -356,15 +388,18 @@ class WekaCluster(object):
             if name is not None:
                 fp.write(WEKA_CLUSTER + name + NL)
 
-            # start-io
             # start FEs
             fp.write(NL)
             hostid = 0
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Front container on host {host}" + NL)
-                fp.write(f'ssh {host} sudo ' + WLSC + ' --name frontend0 --resources-path /tmp/frontend0.json ' +
+                fp.write(PARA +
+                         f'ssh {host} sudo ' + WLSC + ' --name frontend0 --resources-path /tmp/frontend0.json ' +
                          f'--join-ips={host_ips_string} --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
                 hostid += 1
+
+            # wait for parallel commands to finish
+            fp.write(NL + 'wait' + NL)
 
             fp.write(f"echo Configuration process complete" + NL)
         pass
