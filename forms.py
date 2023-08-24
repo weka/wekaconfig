@@ -397,14 +397,18 @@ class SelectHostsForm(CancelNextForm):
                                    scroll_exit=True,  # allow them to exit using arrow keys
                                    use_two_lines=True,  # input fields start on 2nd line
                                    rely=8,  # put it high on the screen
-                                   relx=41,  # place to the right of Networks (above)
+                                   relx=38,  # place to the right of Networks (above)
                                    begin_entry_at=2,  # make the list under the title
                                    max_height=len(self.options_values) + 1,
-                                   max_width=42,
+                                   max_width=38,
                                    name='Enable Options:',
                                    values=self.options_values,  # field labels
                                    value=[]  # which are selected - set later
                                    )
+        #         "Multicontainer Backends (MCB)"
+        # values=["01234567890123456789012345678901234567890123456789", # testing
+        #        "          1         2         3         4"] ) # testing
+
 
     def beforeEditing(self):
         PA = self.parentApp
