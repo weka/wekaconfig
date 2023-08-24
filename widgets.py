@@ -347,16 +347,53 @@ class MemoryWidget(CoresWidgetBase):
         self.display()
 
 
-#class MiscWidget(wekatui.TitleMultiSelect):
-#    def when_value_edited(self):
-#        parent = self.parent
-#        if 0 not in self.value:
-#            parent.memory_field.editable = True
-#        else:
-#            parent.memory_field.editable = False
-#            parent.memory_field.value = None
-#            parent.memory_field.display()
+class OptionsWidget(wekatui.TitleMultiSelect):
+    def when_value_edited(self):
+        # if 0 is in value, Enable HA == True
+        # if 1 is in value, MCB == True
+        parent = self.parent
+        PA = parent.parentApp
 
+        # possible values:
+        # [0,1] = HA, MCB
+        # [0] = HA
+        # [1] = MCB
+        # [] = neither
+
+        edited_value = False
+
+        if 0 in self.value:     # user selected HA True
+            if len(PA.selected_dps) == 1:
+                # beep and ignore
+                curses.beep()
+                self.value.remove(0)
+                PA.HighAvailability = False
+                edited_value = True
+            else:
+                PA.HighAvailability = True
+        else:
+            PA.HighAvailability = False
+
+        if 1 in self.value:
+            if int(PA.weka_ver[0]) < 4:
+                # beep and ignore
+                curses.beep()
+                self.value.remove(1)
+                PA.Multicontainer = False
+                edited_value = True
+            else:
+                PA.Multicontainer = True
+        else:
+            PA.Multicontainer = False
+
+        self.display()
+        return edited_value
+
+    def safe_to_exit(self):
+        if self.when_value_edited():
+            return False
+        else:
+            return True
 
 class BiasWidget(wekatui.TitleMultiSelect):
     def when_value_edited(self):
@@ -447,42 +484,48 @@ class Hosts(wekatui.TitleMultiSelect):
             # they didn't select any
             wekatui.notify_wait("You must select at least 5 hosts", title='ERROR')
             return False
-        # needs to be nics on the reference host > 1
-        if len(PA.selected_dps) > 1 or PA.one_net_multi_nic:
-            parent.ha_field.set_value([0])
-            parent.ha_field.editable = True
-        else:
-            parent.ha_field.set_value([1])
-            parent.ha_field.editable = False
-        parent.ha_field.display()
 
-        if PA.Multicontainer:
-            parent.multicontainer_field.set_value([0])
+        # set up the Options field with default values
+        parent.options_field.editable = True
+        if len(PA.selected_dps) > 1 or PA.one_net_multi_nic or PA.HighAvailability:
+            if 0 not in parent.options_field.value:
+                parent.options_field.value.insert(0, 0)  # turn on HA
+            PA.HighAvailability = True
         else:
-            parent.multicontainer_field.set_value([1])
-        parent.multicontainer_field.display()
+            if 0 in parent.options_field.value:
+                parent.options_field.remove(0)  # turn off HA
+                PA.HighAvailability = False
+        if PA.Multicontainer:
+            if 1 not in parent.options_field.value:
+                parent.options_field.value.insert(1, 1)  # turn on MCB
+            PA.Multicontainer = True
+        else:
+            if 1 in parent.options_field.value:
+                parent.options_field.value.remove(1)  # turn off MCB
+                PA.Multicontainer = False
+        parent.options_field.display()
         return True
 
 
-class HighAvailability(wekatui.TitleSelectOne):
-    _contained_widgets = wekatui.CheckBox
-
-    def __init__(self, *args, **keywords):
-        super().__init__(*args, **keywords)
-
-
-class Multicontainer(wekatui.TitleSelectOne):
-    _contained_widgets = wekatui.CheckBox
-
-    def __init__(self, *args, **keywords):
-        super().__init__(*args, **keywords)
-
-
-class YesNoCheckBox(wekatui.TitleSelectOne):
-    _contained_widgets = wekatui.CheckBox
-
-    def __init__(self, *args, **keywords):
-        super().__init__(*args, **keywords)
+#class HighAvailability(wekatui.TitleSelectOne):
+#    _contained_widgets = wekatui.CheckBox
+#
+#    def __init__(self, *args, **keywords):
+#        super().__init__(*args, **keywords)
+#
+#
+#class Multicontainer(wekatui.TitleSelectOne):
+#    _contained_widgets = wekatui.CheckBox
+#
+#    def __init__(self, *args, **keywords):
+#        super().__init__(*args, **keywords)
+#
+#
+#class YesNoCheckBox(wekatui.TitleSelectOne):
+#    _contained_widgets = wekatui.CheckBox
+#
+#    def __init__(self, *args, **keywords):
+#        super().__init__(*args, **keywords)
 
 
 # a widget for selecting what the dataplane networks are
