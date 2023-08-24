@@ -442,6 +442,7 @@ class WekaHostGroup():
         drives = dict()  # dict of {num_drives: [hosts]}
         drive_sizes = dict()
         homo = True
+        drives_homo = True
 
         # loop through, make notes
         for host, host_obj in self.usable_hosts.items():
@@ -489,20 +490,46 @@ class WekaHostGroup():
             for ram_GB, ramhostlist in sorted(ram.items()):
                 log.info(f"  There are {len(ramhostlist)} hosts with {ram_GB} GB of RAM: {sorted(ramhostlist)}")
 
+        # check if they all have the same number of drives
         if len(drives) != 1:
             homo = False
             log.error("Hosts do not have a homogeneous number of drives")
             for num_drives, drivehostlist in sorted(drives.items()):
                 log.info(f"  There are {len(drivehostlist)} hosts with {num_drives} drives: {sorted(drivehostlist)}")
 
+        #  Check if the drives are all the same size
+        #  Just note and move on - not necessarily an error
         if len(drive_sizes) != 1:
-            homo = False
-            log.error("Hosts do not have a homogeneous drive sizes")
+            log.error("Hosts do not have homogeneous drive sizes")
             for drive_size, drivehostlist in sorted(drive_sizes.items()):
                 log.info(f"  There are {len(drivehostlist)} hosts with " +
                          f"{round(drive_size / 1000 / 1000 / 1000 / 1000, 2)} TB/" +
                          f"{round(drive_size / 1024 / 1024 / 1024 / 1024, 2)} TiB " +
                          f"drives: {sorted(drivehostlist)}")
+
+        # check if all the hosts' drives are the same set (even if there are multiple drive sizes...)
+        # check common fields
+        all_same = True     # assume innocent until proven guilty
+
+        ref_drives = sorted(self.referencehost_obj.drives)
+        for host in self.usable_hosts.values():  # already sorted
+            for name, ref_drive in sorted(self.referencehost_obj.drives.items()):
+                if ref_drive['devName'] in host.drives:
+                    host_drive = host.drives[ref_drive['devName']]
+                    if ref_drive['diskSizeBytes'] != host_drive['diskSizeBytes']:
+                        log.info(f'Host {host.name}:{ref_drive["devPath"]} has a different size than reference host')
+                        all_same = False    # guilty
+                        continue    # no sense in continuing with this drive
+                else:
+                    log.info(f'Host {host.name} is missing drive {ref_drive["devName"]}')
+                    all_same = False
+
+        if all_same:
+            log.info("All hosts have the same drives")
+            self.drives_homo = True
+        else:
+            log.info("Hosts have varying drives")
+            self.drives_homo = False
 
         return homo
 
