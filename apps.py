@@ -61,6 +61,7 @@ class WekaConfigApp(wekatui.NPSAppManaged):
         else:
             self.Multicontainer = True
         self.protocols_memory = None
+        self.HighAvailability = False
 
         log.info("starting UI...")
 

@@ -11,7 +11,7 @@ log = getLogger(__name__)
 
 from widgets import UsableCoresWidget, ComputeCoresWidget, FeCoresWidget, DrivesCoresWidget, \
     NameWidget, DataWidget, ParityWidget, WekaTitleFixedText, MemoryWidget, Networks, Hosts, \
-    HighAvailability, Multicontainer, SparesWidget, BiasWidget
+    SparesWidget, BiasWidget, OptionsWidget
 
 from logic import Cores
 
@@ -71,6 +71,7 @@ class SelectCoresForm(PrevDoneForm):
         self.total_drives_field = self.add(WekaTitleFixedText, label="Drives per host", entry_field_width=3)
         self.num_hosts_field = self.add(WekaTitleFixedText, label="Number of hosts", entry_field_width=3)
         self.nextrely += 1  # skip 2 lines
+
         self.bias_values = [
             "Enable Protocols",
             "Protocols are Primary",
@@ -374,18 +375,36 @@ class SelectHostsForm(CancelNextForm):
                                     name='Select Hosts:')
         # values=["01234567890123456789012345678901234567890123456789", # testing
         #        "          1         2         3         4"] ) # testing
-        self.ha_field = self.add(HighAvailability, name="High Availability:",
-                                 scroll_exit=True,  # allow them to exit using arrow keys
-                                 rely=8, relx=41,
-                                 use_two_lines=True, editable=True,
-                                 begin_entry_at=2,  # make the list under the title
-                                 values=["Yes", "No"])
-        self.multicontainer_field = self.add(Multicontainer, name="Multicontainer:",
-                                             scroll_exit=True,  # allow them to exit using arrow keys
-                                             rely=13, relx=41,
-                                             use_two_lines=True, editable=True,
-                                             begin_entry_at=2,  # make the list under the title
-                                             values=["Yes", "No"])
+        #self.ha_field = self.add(HighAvailability, name="High Availability:",
+        #                         scroll_exit=True,  # allow them to exit using arrow keys
+        #                         rely=8, relx=41,
+        #                         use_two_lines=True, editable=True,
+        #                         begin_entry_at=2,  # make the list under the title
+        #                         values=["Yes", "No"])
+        #self.multicontainer_field = self.add(Multicontainer, name="Multicontainer:",
+        #                                     scroll_exit=True,  # allow them to exit using arrow keys
+        #                                     rely=13, relx=41,
+        #                                     use_two_lines=True, editable=True,
+        #                                     begin_entry_at=2,  # make the list under the title
+        #                                     values = ["Yes", "No"])
+
+        self.options_values = [
+            "High Availability (HA)",
+            "Multicontainer Backends (MCB)"
+        ]
+
+        self.options_field = self.add(OptionsWidget,
+                                   scroll_exit=True,  # allow them to exit using arrow keys
+                                   use_two_lines=True,  # input fields start on 2nd line
+                                   rely=8,  # put it high on the screen
+                                   relx=41,  # place to the right of Networks (above)
+                                   begin_entry_at=2,  # make the list under the title
+                                   max_height=len(self.options_values) + 1,
+                                   max_width=42,
+                                   name='Enable Options:',
+                                   values=self.options_values,  # field labels
+                                   value=[]  # which are selected - set later
+                                   )
 
     def beforeEditing(self):
         PA = self.parentApp
@@ -415,16 +434,15 @@ class SelectHostsForm(CancelNextForm):
             except AttributeError:  # haven't set self.min_host_ramGB yet...
                 PA.min_host_ramGB = int(host.total_ramGB)
 
-        if self.ha_field.value == [0]:
-            PA.HighAvailability = True
-        else:
-            PA.HighAvailability = False
+        #if 0 in self.options_field.values:
+        #    PA.HighAvailability = True
+        #else:
+        #    PA.HighAvailability = False
 
-        # if hasattr(self, "multicontainer_field") and self.multicontainer_field.value == [0]:
-        if self.multicontainer_field.value == [0]:
-            PA.Multicontainer = True
-        else:
-            PA.Multicontainer = False
+        #if 1 in self.options_field.values:
+        #    PA.Multicontainer = True
+        #else:
+        #    PA.Multicontainer = False
 
         PA.setNextForm("SelectCoresForm")
 
