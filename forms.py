@@ -370,7 +370,7 @@ class SelectHostsForm(CancelNextForm):
                                     # rely=2,  # put it high on the screen
                                     # relx=39,  # place to the right of Networks (above)
                                     relx=2, rely=10,
-                                    max_width=40,
+                                    max_width=39,
                                     begin_entry_at=2,  # make the list under the title
                                     name='Select Hosts:')
         # values=["01234567890123456789012345678901234567890123456789", # testing
