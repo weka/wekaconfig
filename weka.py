@@ -441,8 +441,7 @@ class WekaHostGroup():
         ram = dict()  # dict of {ram_GB: [hosts]}
         drives = dict()  # dict of {num_drives: [hosts]}
         drive_sizes = dict()
-        homo = True
-        drives_homo = True
+        self.homo = True
 
         # loop through, make notes
         for host, host_obj in self.usable_hosts.items():
@@ -451,6 +450,7 @@ class WekaHostGroup():
             corehostlist.append(host)
             cores[host_obj.num_cores] = corehostlist
 
+            # check hyperthreading
             hyperthreadlist = hyperthreads.get(host_obj.hyperthread, list())
             hyperthreadlist.append(host)
             hyperthreads[host_obj.hyperthread] = hyperthreadlist
@@ -465,8 +465,7 @@ class WekaHostGroup():
             drivehostlist.append(str(host_obj))
             drives[len(host_obj.drives)] = drivehostlist
 
-            # these_drives = drive_sizes.get(host_obj.drives, list())   # returns list of drives
-            # find the host_obj.machine_info.disks entry (its a list) where dev_path == these_drives
+            # create list of drive sizes...
             for drive in host_obj.drives.values():
                 drive_size_hostlist = drive_sizes.get(drive['sizeBytes'], list())
                 if host not in drive_size_hostlist:
@@ -474,31 +473,32 @@ class WekaHostGroup():
                 drive_sizes[drive['sizeBytes']] = drive_size_hostlist
 
         if len(cores) != 1:
-            homo = False
+            self.homo = False
             log.error("Hosts do not have a homogeneous number of cores")
             for corecount, corehostlist in sorted(cores.items()):
                 log.info(f"  There are {len(corehostlist)} hosts with {corecount} cores: {sorted(corehostlist)}")
 
         if len(hyperthreads) != 1:
+            self.homo = False
             log.error("Not all hosts share hyperthread/SMT setting")
             for value, hostlist in hyperthreads.items():
                 log.info(f"  There are {len(hostlist)} hosts with Hyperthreading/SMT {value}: {sorted(hostlist)}")
 
         if len(ram) != 1:
-            homo = False
+            self.homo = False
             log.error("Hosts do not have a homogeneous amount of ram")
             for ram_GB, ramhostlist in sorted(ram.items()):
                 log.info(f"  There are {len(ramhostlist)} hosts with {ram_GB} GB of RAM: {sorted(ramhostlist)}")
 
         # check if they all have the same number of drives
         if len(drives) != 1:
-            homo = False
+            self.homo = False
             log.error("Hosts do not have a homogeneous number of drives")
             for num_drives, drivehostlist in sorted(drives.items()):
                 log.info(f"  There are {len(drivehostlist)} hosts with {num_drives} drives: {sorted(drivehostlist)}")
 
         #  Check if the drives are all the same size
-        #  Just note and move on - not necessarily an error
+        #  Just note and move on - not necessarily an error?
         if len(drive_sizes) != 1:
             log.error("Hosts do not have homogeneous drive sizes")
             for drive_size, drivehostlist in sorted(drive_sizes.items()):
@@ -509,29 +509,44 @@ class WekaHostGroup():
 
         # check if all the hosts' drives are the same set (even if there are multiple drive sizes...)
         # check common fields
-        all_same = True     # assume innocent until proven guilty
-
-        ref_drives = sorted(self.referencehost_obj.drives)
+        self.drives_homo = True     # assume innocent until proven guilty
         for host in self.usable_hosts.values():  # already sorted
             for name, ref_drive in sorted(self.referencehost_obj.drives.items()):
                 if ref_drive['devName'] in host.drives:
                     host_drive = host.drives[ref_drive['devName']]
                     if ref_drive['diskSizeBytes'] != host_drive['diskSizeBytes']:
                         log.info(f'Host {host.name}:{ref_drive["devPath"]} has a different size than reference host')
-                        all_same = False    # guilty
+                        self.drives_homo = False    # guilty
                         continue    # no sense in continuing with this drive
                 else:
                     log.info(f'Host {host.name} is missing drive {ref_drive["devName"]}')
-                    all_same = False
+                    self.drives_homo = False
 
-        if all_same:
+        if self.drives_homo:
             log.info("All hosts have the same drives")
-            self.drives_homo = True
         else:
             log.info("Hosts have varying drives")
-            self.drives_homo = False
 
-        return homo
+        # Check if the networks appear the same on all hosts - same interfaces on the same networks
+        self.nics_homo = True     # assume innocent until proven guilty
+        for host in self.usable_hosts.values():  # already sorted
+            for name, ref_nic in sorted(self.referencehost_obj.nics.items()):
+                if ref_nic.name in host.nics:
+                    host_nic = host.nics[ref_nic.name]
+                    if ref_nic.network != host_nic.network:
+                        log.info(f'Host {host.name}:{ref_nic.name} is on a different network than reference host')
+                        self.nics_homo = False    # guilty
+                        continue    # no sense in continuing with this nic
+                else:
+                    log.info(f'Host {host.name} is missing interface {ref_nic.name}')
+                    self.nics_homo = False
+
+        if self.nics_homo:
+            log.info("All hosts have the same network interfaces")
+        else:
+            log.info("Hosts have varying network interfaces")
+
+        return self.homo and self.drives_homo and self.nics_homo
 
     def get_hostinfo(self):
         """
