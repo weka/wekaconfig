@@ -148,7 +148,7 @@ class STEMHost(object):
 
     def find_interface_details(self, iface):
         for eth in self.machine_info['eths']:
-            if eth['interface_alias'] == iface:
+            if eth['interface_alias'] == iface or eth['ethName'] == iface:  # changed interface_alias in newer releases
                 return eth
         return None
 
