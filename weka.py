@@ -379,7 +379,7 @@ class WekaHostGroup():
         # Note that self.ssh_client is a session open to refhost...
         ssh_out = self.ssh_client.run(f"ping -c1 -W1 -I {source_interface} {targetip.ip}")
         if ssh_out.status == 0:
-            log.debug(f"Ping successful - adding {hostname} to accessible_hosts")
+            log.debug(f"Ping from {hostname}/{source_interface} to target {hostname}-{targetip} successful - adding {hostname} to accessible_hosts")
             # we were able to ping the host!  add it to the set of hosts we can access via this IF
 
             self.accessible_hosts[source_interface].add(hostname)
@@ -387,7 +387,7 @@ class WekaHostGroup():
             if targetip.network not in self.numnets[source_interface]:
                 self.numnets[source_interface].add(targetip.network)  # note unique networks (should get blake's)
         else:
-            log.debug(f"From {source_interface} target {hostname}-{targetip} failed with rc={ssh_out.status}")
+            log.debug(f"From {hostname}/{source_interface} target {hostname}-{targetip} failed with rc={ssh_out.status}")
 
     def get_gateways(self, host, nic):
         log.info(f"probing gateway for {host}/{nic.name}")
