@@ -363,7 +363,7 @@ class OptionsWidget(wekatui.TitleMultiSelect):
         edited_value = False
 
         if 0 in self.value:     # user selected HA True
-            if len(PA.selected_dps) == 1:
+            if len(PA.selected_dps) == 1 and not PA.one_net_multi_nic:
                 # beep and ignore
                 curses.beep()
                 self.value.remove(0)
