@@ -55,6 +55,9 @@ class STEMHost(object):
         self.total_ramGB = None
         self.version = None
 
+    def __str__(self):
+        return self.name
+
     def get_machine_info(self):
         """
         get the info_hw output from the API
@@ -68,17 +71,15 @@ class STEMHost(object):
             log.info(f"Error communicating with host {self.name} querying info")
             return
 
+        # take some of the info and put it in our object for easy reference
         self.num_cores = len(self.machine_info['cores'])
         self.cpu_model = self.machine_info['cores'][0]['model']
         self.version = self.machine_info['version']
-        # self.info_hw = info_hw  # save a copy in case we need it
         self.total_ramGB = int(self.machine_info["memory"]["total"] / 1024 / 1024 / 1024)
 
         for drive in self.machine_info['disks']:
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
                     len(drive['pciAddr']) > 0 and drive['type'] == 'DISK':
-                # not drive['isSwap'] and \     # pukes now; no longer there in 3.13
-                # self.drives[drive['devName']] = drive['devPath']
                 self.drives[drive['devName']] = drive
 
         # need to determine if any of the above drives are actually in use - boot devices, root drives, etc.
@@ -90,58 +91,76 @@ class STEMHost(object):
         # remove any drives with mounted partitions from the list
         for drive in self.machine_info['disks']:
             if drive['type'] == "PARTITION" and drive['parentName'] in self.drives and drive['isMounted']:
-                # if drive['isSwap'] or drive['isMounted']:
                 del self.drives[drive['parentName']]
 
+    def validate_nics(self):
         for net_adapter in self.machine_info['net']['interfaces']:
             if net_adapter['name'] == 'lo':  # we can't use loopback interfaces anyway
                 continue
+            details = self.find_interface_details(net_adapter['name'])
+            if details is None:
+                log.debug(f"no details available for {self.name}/{net_adapter['name']} on host '{self.name}' - skipping")
+                continue
+            if not (details['validationCode'] == "OK" and details['linkDetected']):
+                log.debug(f"Skipping interface {self.name}/{net_adapter['name']} - down or not validated")
+                continue
+
             # (bruce) change lowest allowed mtu to 1400 - we technically support 2k on ib
             # and in theory support 1500 on eth, so don't abort without options for low MTUs
-            if net_adapter['mtu'] <= 1400 or net_adapter['mtu'] >= 10000:
-                log.debug(
-                    f'{self.name}: Skipping {net_adapter["name"]} due to MTU {net_adapter["mtu"]} out of range')
-                continue
+            if net_adapter['linkLayer'] == 'IB':
+                if net_adapter['mtu'] != 2048 and net_adapter['mtu'] != 4092:
+                    log.debug(f'{self.name}: Skipping {self.name}/{net_adapter["name"]} due to unsupported MTU:{net_adapter["mtu"]}')
+                    continue
+            elif net_adapter['linkLayer'] == 'ETH':
+                if net_adapter['mtu'] < 1500 or net_adapter['mtu'] >= 10000:
+                    log.debug(
+                        f'{self.name}: Skipping {self.name}/{net_adapter["name"]} due to MTU {net_adapter["mtu"]} out of range')
+                    continue
+
             if len(net_adapter['ip4']) <= 0:
-                log.debug(f'{self.name}: Skipping interface {net_adapter["name"]} - unconfigured')
+                log.debug(f'{self.name}: Skipping interface {self.name}/{net_adapter["name"]} - unconfigured')
                 continue
 
             if net_adapter['bondType'] == 'SLAVE':
-                log.debug(f'{self.name}: Skipping interface {net_adapter["name"]} - is a slave to a bond')
+                log.debug(f'{self.name}: Skipping interface {self.name}/{net_adapter["name"]} - is a slave to a bond')
                 continue
 
             if net_adapter['bondType'] == 'NONE':  # "NONE", "BOND" and "SLAVE" are valid
                 # a "regular" interface
-                details = self.find_interface_details(net_adapter['name'])
-                if details is None:
-                    log.error(f"no details available for {net_adapter['name']} on host '{self.name}' - skipping")
-                    continue
-                if details['validationCode'] == "OK" and details['linkDetected']:
-                    self.nics[net_adapter['name']] = WekaInterface(net_adapter['linkLayer'],
+                #details = self.find_interface_details(net_adapter['name'])
+                #if details is None:
+                #    log.error(f"no details available for {net_adapter['name']} on host '{self.name}' - skipping")
+                #    continue
+                #if details['validationCode'] == "OK" and details['linkDetected']:
+                self.nics[net_adapter['name']] = WekaInterface(net_adapter['linkLayer'],
                                                                    net_adapter['name'],
                                                                    f"{net_adapter['ip4']}/{net_adapter['ip4Netmask']}",
                                                                    details['speedMbps'])
-                    log.info(f"{self.name}: interface {net_adapter['name']} added to config")
+                log.info(f"{self.name}: interface {self.name}/{net_adapter['name']} added to config")
+                #else:
+                #   log.debug(f"{self.name}: interface {net_adapter['name']} is down - skipping")
             elif net_adapter['bondType'][:4] == 'BOND':  # can be "BOND_MLTI_NIC" or whatever.  Same diff to us
                 # bonds don't appear in the net_adapters... have to build it from the slaves
                 if len(net_adapter['name_slaves']) == 0:  # what are other values?
-                    log.error(f"{self.name}:{net_adapter['name']}: bond has no slaves?; skipping")
+                    log.error(f"{self.name}/{net_adapter['name']}: bond has no slaves?; skipping")
                     continue
-                log.info(f"{self.name}:{net_adapter['name']}:name_slaves = {net_adapter['name_slaves']}")
+                log.info(f"{self.name}/{net_adapter['name']}:name_slaves = {net_adapter['name_slaves']}")
                 # find an "up" slave, if any
                 for slave in net_adapter['name_slaves']:
-                    details = self.find_interface_details(slave)
-                    if details is None:
-                        log.error(f"no details available for {slave} on host '{self.name}' - skipping")
+                    slave_details = self.find_interface_details(slave)
+                    if slave_details is None:
+                        log.error(f"no details available for slave interface {slave} on host '{self.name}' - skipping")
                         continue
-                    if details['validationCode'] == "OK" and details['linkDetected']:
-                        log.info(f"{self.name}: {net_adapter['name']}: slave {details['ethName']} good.")
+                    if slave_details['validationCode'] == "OK" and slave_details['linkDetected']:
+                        log.info(f"{self.name}: {net_adapter['name']}: slave {slave_details['ethName']} good.")
                         self.nics[net_adapter['name']] = \
                             WekaInterface(net_adapter['linkLayer'], net_adapter['name'],
-                                          f"{net_adapter['ip4']}/{net_adapter['ip4Netmask']}", details['speedMbps'])
+                                          f"{net_adapter['ip4']}/{net_adapter['ip4Netmask']}", slave_details['speedMbps'])
                         log.info(f"{self.name}: bond {net_adapter['name']} added to config")
                         # we don't care about other slaves once we find a working one - they should all be the same
                         break
+                    else:
+                        log.info(f"{self.name}: bond {net_adapter['name']} is down - skipping")
                 log.error(f"{self.name}: bond {net_adapter['name']} has no up slaves - skipping")
             else:
                 log.info(f"{self.name}:{net_adapter['name']} - unknown bond type {net_adapter['bondType']}")
@@ -157,9 +176,6 @@ class STEMHost(object):
     #            if eth['ethBondingMaster'] == iface:
     #                return eth
     #        return None
-
-    def __str__(self):
-        return self.name
 
     def open_api(self, ip_list=None):
         """
@@ -186,18 +202,61 @@ class STEMHost(object):
                 log.debug(f"Error opening API for host {self.name} on ip {ip}: {exc}")
                 continue
             except NewConnectionError as exc:
-                log.error(f"Unable to contact host {self.name} - is weka installed there?")
+                #log.error(f"Unable to contact host {self.name}")
                 continue
             except Exception as exc:
                 log.error(f"Other exception on host {self.name}: {exc}")
                 continue
 
         if self.host_api is None:
-            log.debug(f"{self.name}: unable to open api to {self.name}")
+            log.debug(f"{self.name}: unable to open api to {self.name} - skipping")
             return None
         else:
             log.debug(f"host api opened on {self.name} via {ip}")
 
+    def lscpu(self):
+        # it would be nice to be able to get json output, but some old OS versions don't support it
+        self.lscpu_data = dict()
+        cmd_output = self.ssh_client.run("lscpu")
+        if cmd_output.status == 0:
+            # we were able to run lscpu
+            outputlines = cmd_output.stdout.split('\n')
+            if len(outputlines) > 0:
+                #log.debug(f"got lscpu output for {self.name}")
+                for line in outputlines:
+                    splitlines = line.split(':')
+                    if len(splitlines) > 1:
+                        self.lscpu_data[splitlines[0].strip()] = splitlines[1].strip()
+            else:
+                log.error(f"Host {self.name}: Unable to parse lscpu output - no lines")
+        else:
+            log.error(f"lscpu failed on {self.name}")
+
+    def check_source_routing(self):
+        # check if the host has source-based routing set up
+        self.ip_rules = dict()
+        cmd_output = self.ssh_client.run("ip rule show | grep -v all")
+        if cmd_output.status == 0:
+            outputlines = cmd_output.stdout.split('\n')
+            if len(outputlines) > 0:
+                for line in outputlines:
+                    splitlines = line.split(':')
+                    if len(splitlines) > 1:
+                        self.ip_rules[splitlines[0].strip()] = splitlines[1].strip().split()
+            else:
+                log.error(f"Host {self.name}: Unable to parse 'ip rule show' output - no lines")
+        else:
+            log.error(f"'ip rule show' failed on {self.name}")
+
+        if len(self.ip_rules) == 0:
+            log.info(f"{self.name}: No source-based routing rules found")
+            return False
+        return True
+        #for nic in self.nics:
+        #    for rule in self.ip_rules:
+        #        if rule
+        #    if nic.ip in self.ip_rules:
+        #        log.info(f"{self.name}: {nic} has source-based routing set up")
 
 class WekaHostGroup():
     def __init__(self, reference_hostname, beacons):
@@ -212,12 +271,16 @@ class WekaHostGroup():
         :param beacons: dict of hostname:[list of ip addrs]
         :return: a list of STEMHost objects
         """
+        self.mixed_networking = False
+        self.link_types = list()
+        self.local_subnets = list()
         self.isrouted = False
         self.one_network = False
         self.usable_hosts = dict()
         self.accessible_hosts = dict()  # a dict of {ifname:(hostname)}  (set of hostnames on the nic)
         self.pingable_ips = dict()
-        self.numnets = dict()
+        self.networks = dict()
+        self.candidates = dict()
 
         default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
         self.beacons = beacons
@@ -229,54 +292,91 @@ class WekaHostGroup():
             self.reference_hostname = reference_hostname  # for now
             ref_is_local = False  # note that we DO need to use ssh to run commands on this host
 
-        candidates = dict()
-        # cycle through the beacon hosts, and fetch their HW info, create STEMHosts
+        # RATS!  Beacons are unreliable...  we need to validate all of them
+        #good_beacons = dict()
+        #for host, ip_list in self.beacons.items():
+        #    # this might a dodgy assumption, but if there should always be beacons from the OS Management network
+        #    # AND the dataplane network, so if there's only one, something is wrong
+        #    if len(ip_list) == 1:
+        #        log.debug(f"Beacon Host {host} only accessible via {ip_list[0]} - skipping")
+        #    else:
+        #        good_beacons[host] = ip_list
+
         log.info(f"Getting configuration info from hosts...")
+        self.create_candidates()
+        log.debug(f"candidates = {list(self.candidates.keys())}")
+        self.open_candidate_api()
+        log.debug(f"candidates = {list(self.candidates.keys())}")
+        self.scan_machine_info()
+        log.debug(f"candidates = {list(self.candidates.keys())}")
+        self.check_weka_release()
+        log.debug(f"candidates = {list(self.candidates.keys())}")
+        self.explore_network()
+        log.debug(f"candidates = {list(self.candidates.keys())}")
+        self.analyze_networks()
+        log.debug(f"candidates = {list(self.candidates.keys())}")
+        self.get_hardware_info()
+        log.debug(f"candidates = {list(self.candidates.keys())}")
+
+    def create_candidates(self):
+        # cycle through the beacon hosts, and fetch their HW info, create STEMHosts
         for host, ip_list in self.beacons.items():
             # if we're going to do this, we have to create the STEMHost object first, not below
             candidate = STEMHost(host)
             # Open an API to each host, in parallel
-            log.info(f"opening api to {host}")
+            log.debug(f"opening api to {host}")
             threaded_method(candidate, STEMHost.open_api, ip_list)  # schedule to run (they're slow)
-            candidates[host] = candidate
+            self.candidates[host] = candidate
             # candidate.open_api(ip_list)
-
         default_threader.run()  # run the threaded methods
 
+    def open_candidate_api(self):
         # weed out the ones we can't talk to or reach
-        for host, candidate in candidates.copy().items():
+        for host, candidate in self.candidates.copy().items():
             if candidate.host_api is None:
-                log.info(f"Unable to communicate with {host} - skipping")
-                del candidates[host]  # remove it from the list
+                log.info(f"Unable to communicate with {host} API - skipping")
+                del self.candidates[host]  # remove it from the list
 
-        parallel(candidates.values(), STEMHost.get_machine_info)
+
+    def scan_machine_info(self):
+        log.debug(f"Getting machine info from hosts...")
+        parallel(self.candidates.values(), STEMHost.get_machine_info)
+        log.debug(f"Got machine info from {list(self.candidates.keys())}")
 
         # find the basis host (the one they gave us on the command line)
-        if self.reference_hostname not in candidates:
+        if self.reference_hostname not in self.candidates:
             # something is amiss - the host they told us to talk to doesn't list itself as a STEM host?
             log.error(f"{self.reference_hostname}: Unable to fetch HW info from reference host (self); aborting")
-            log.error("This is normally due to ssh issues")
+            log.error(f"This is normally due to issues calling api on {self.reference_hostname} - check network")
             sys.exit(1)
 
-        self.referencehost_obj = candidates[self.reference_hostname]
+        self.referencehost_obj = self.candidates[self.reference_hostname]
 
-        if len(self.referencehost_obj.nics) == 0:
-            log.error(f"Reference host ({self.referencehost_obj.name}) has no usable nics?")
-            sys.exit(1)
+        #if len(self.referencehost_obj.nics) == 0:
+        #    log.error(f"Reference host ({self.referencehost_obj.name}) has no usable nics?")
+        #    sys.exit(1)
 
+    def check_weka_release(self):
         # find hosts that can cluster with reference_hostname - they pointed us at reference_hostname for a reason
         log.info(f"Reference Host {self.reference_hostname} is running WEKA release {self.referencehost_obj.version}")
         log.info(f"Searching for other {self.referencehost_obj.version} hosts...")
-        for host, candidate in candidates.copy().items():  # copy it so we can del() from orig list
+        for host, candidate in self.candidates.copy().items():  # copy it so we can del() from orig list
             if candidate.machine_info is None:
                 log.error(f"Error communicating with {host} - removing from list")
-                del candidates[host]  # remove it from the list
+                del self.candidates[host]  # remove it from the list
+                continue
             elif candidate.version != self.referencehost_obj.version:
                 log.info(f"    host {host} is not running v{self.referencehost_obj.version} - removing from list")
-                del candidates[host]
+                del self.candidates[host]
+                continue
             else:
-                log.info(f"Host {host} added to list of cluster hosts")
+                candidate.validate_nics()
+                if len(candidate.nics) == 0:
+                    log.error(f"{host} has no usable nics?  Skipping...")
+                    continue
+            log.info(f"Host {host} added to list of possible cluster hosts")
 
+    def explore_network(self):
         log.info("Preparing to explore network...")
         self.ssh_client = RemoteServer(self.reference_hostname)
         self.ssh_client.connect()
@@ -295,36 +395,50 @@ class WekaHostGroup():
             self.accessible_hosts[source_interface] = set()  # hosts by interface on the reference host
             self.accessible_hosts[source_interface].add(self.reference_hostname)  # always add this
             self.pingable_ips[source_interface] = list()  # ips pingable from this interface
-            self.numnets[source_interface] = set()
+            self.networks[source_interface] = set()
 
         log.info("Exploring network... this may take a while")
-        # set up for parallel execution
+
+        # set up for parallel execution ########################
         log.debug(f"refhost.nics = {list(self.referencehost_obj.nics.keys())}")
-        for hostname, hostobj in candidates.items():
+        for hostname, hostobj in self.candidates.items():
             log.info(f'Looking at host {hostname}...')
             # see if the reference host can talk to the target ip on each interface
             for source_interface in self.referencehost_obj.nics.keys():  # refhost nic
                 for targetif, targetip in hostobj.nics.items():  # candidate nic
-                    if hostname == reference_hostname and source_interface == targetif:
+                    if hostname == self.reference_hostname and source_interface == targetif:
                         self.pingable_ips[source_interface].append(targetip)  # make sure refhost is there
                         continue  # not sure why, but ping fails on loopback anyway
 
-                    log.debug(f"checking {hostobj.name}/{source_interface}/{targetip.ip} from {source_interface}")
+                    #log.debug(f"checking {hostobj.name}/{source_interface}/{targetip.ip} from {source_interface}")
+                    # source_interface is the interface on the reference host
+                    # hostobj is the host we're pinging
+                    # targetip is the ip on the host that we're pinging
                     threaded_method(self, WekaHostGroup.ping_clients, source_interface, hostobj, targetip)
 
-        # execute them
-        default_threader.run()
+        # execute the pings...  ###################
+        default_threader.run()   # sets self.accessible_hosts and self.pingable_ips
+
+    def analyze_networks(self):
+        # note: self.accessible_hosts is a dict of {ifname:(hostname)}  (set of hostnames on the nic)
+        # note that self.pingable_ips is a dict of {ifname:[ipaddr]}  (list of ip addrs pingable from this interface)
 
         # merge the accessible_hosts sets - we need the superset for later
-        usable_set = set()  # should we really be using sets here?  A dict might work easier
-        # self.usable_hosts = dict()  # definitive list (well, dict) of hosts
+        usable_set = set()  # a set will always be unique... no duplicates
+        something_wrong = False
         for host_set in self.accessible_hosts.values():
             if len(usable_set) != 0 and host_set != usable_set:
-                log.warning("Not all hosts are accessible from all interfaces - check network config")
+                something_wrong = True
             usable_set = usable_set.union(host_set)
+
+        if something_wrong:
+            log.error("There are hosts that are not accessible from all interfaces - check network config")
+            for iface, host_set in sorted(self.accessible_hosts.items()):
+                log.error(f"    hosts accessible from {iface}: {sorted(host_set)}")
+
         # log.info(f"There are {len(usable_set)} ping-able hosts")
         for host in usable_set:
-            self.usable_hosts[host] = candidates[host]
+            self.usable_hosts[host] = self.candidates[host]
         # for some odd reason, the above ping doesn't work when loopback.  Go figure
         self.usable_hosts[self.referencehost_obj.name] = self.referencehost_obj  # he gets left out
 
@@ -332,22 +446,22 @@ class WekaHostGroup():
 
         # are the other hosts on different subnets?
         for source_interface in self.referencehost_obj.nics.keys():
-            if len(self.numnets[source_interface]) > 1:
-                self.isrouted = True  # not completely sure this is correct...
+            if len(self.networks[source_interface]) > 1:
+                self.isrouted = True  # not completely sure this is correct... it should have routes to all the networks
 
         # is there more than one subnet on this host? (ie: are all the interfaces on the same subnet?)
-        if not self.isrouted:
-            self.local_subnets = []
+        if not self.isrouted:    # does it really matter if we're routed?
             for source_interface, if_obj in self.referencehost_obj.nics.items():
                 if if_obj.network not in self.local_subnets:
-                    self.local_subnets.append(if_obj.network)
+                    self.local_subnets.append(if_obj.network) # a list of unique networks
             if len(self.local_subnets) > 1:
-                self.isrouted = True  # hmm... doesn't really mean it's routed; could be just 2 subnets
+                self.isrouted = True  # hmm... doesn't really mean it's routed; could be just 2 subnets?
             else:
+                # also - if one network and more than 1 nic, we need source-based routing?
+                # not sure if this is the best place to check
                 self.one_network = True
 
         # network link layer types
-        self.link_types = list()
         for source_interface, if_obj in self.referencehost_obj.nics.items():
             if if_obj.type not in self.link_types:
                 self.link_types.append(if_obj.type)
@@ -355,39 +469,57 @@ class WekaHostGroup():
         # do we have both IB and ETH interfaces? (maybe we should check this AFTER they select the dataplane?)
         if len(self.link_types) > 1:
             self.mixed_networking = True
-        else:
-            self.mixed_networking = False
 
         # go probe the hosts to see if they have a default route set, if so, we'll config weka to use it
         log.info(f"Opening ssh to hosts")
-        self.open_ssh_toall()
+        self.open_ssh_toall()   # I think we did this already...
 
-        # default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
         log.info("Probing for gateways")
         for host, host_obj in sorted(self.usable_hosts.items()):
             for nicname, nic_obj in host_obj.nics.items():
                 # threaded_method(host_obj, WekaHostGroup.get_gateways, host_obj, nic_obj)
                 if nic_obj.type != "IB":  # we don't support gateways on IB
                     self.get_gateways(host_obj, nic_obj)
-        # parallel(self, WekaHostGroup.get_gateways)
-        # default_threader.run()
-        self.get_hostinfo()
+
+        # check if they need source-based routing and see if they have it set up
+        if self.one_network:
+            log.info("There is only one network on the reference host")
+            if len(self.referencehost_obj.nics) > 1:
+                log.info("There are multiple UP interfaces on the reference host")
+                log.info("Checking for source-based routing")
+                for hostname, host_obj in self.usable_hosts.items():
+                    if not host_obj.check_source_routing():
+                        log.error(f"{host_obj.name} needs source-based routing set up")
+                    else:
+                        log.info(f"{host_obj.name} appears to have source-based routing set up")
+
 
     def ping_clients(self, source_interface, hostobj, targetip):
+        """
+        # ping the target host interface from the reference host (may be more than one interface per)
+        :param source_interface:
+        :type source_interface:
+        :param hostobj:  target STEMhost object
+        :type STEMHost:
+        :param targetip:
+        :type WekaInterface:
+        :return: Fills in self.accessible_hosts and self.pingable_ips
+        :rtype: None
+        """
         hostname = hostobj.name
-        log.debug(f"pinging from {hostname}/{source_interface} to {targetip.ip}")
+        #log.debug(f"pinging from {self.referencehost_obj.name}/{source_interface} to {hostname}/{targetip.ip}")
         # Note that self.ssh_client is a session open to refhost...
         ssh_out = self.ssh_client.run(f"ping -c1 -W1 -I {source_interface} {targetip.ip}")
         if ssh_out.status == 0:
-            log.debug(f"Ping from {hostname}/{source_interface} to target {hostname}-{targetip} successful - adding {hostname} to accessible_hosts")
+            log.debug(f"Ping from {self.referencehost_obj.name}/{source_interface} to target {hostname}/{targetip} successful - adding {hostname} to accessible_hosts")
             # we were able to ping the host!  add it to the set of hosts we can access via this IF
 
             self.accessible_hosts[source_interface].add(hostname)
             self.pingable_ips[source_interface].append(targetip)
-            if targetip.network not in self.numnets[source_interface]:
-                self.numnets[source_interface].add(targetip.network)  # note unique networks (should get blake's)
+            if targetip.network not in self.networks[source_interface]:  # do this elsewhere?
+                self.networks[source_interface].add(targetip.network)  # note unique networks (should get blake's)
         else:
-            log.debug(f"From {hostname}/{source_interface} target {hostname}-{targetip} failed with rc={ssh_out.status}")
+            log.debug(f"Ping from {self.referencehost_obj.name}/{source_interface} target {hostname}/{targetip} failed with rc={ssh_out.status} - skipping")
 
     def get_gateways(self, host, nic):
         log.info(f"probing gateway for {host}/{nic.name}")
@@ -395,13 +527,14 @@ class WekaHostGroup():
         # try google DNS because we're sure they don't have it on their network...
         if not self.probe_gateway(host, nic, '8.8.8.8'):
             # no default gateway, see if there are any gateways to the other nodes...
-            for interface, target in self.pingable_ips.items():
-                if self.probe_gateway(host, nic, target):
-                    break
+            for interface, target_list in self.pingable_ips.items():
+                for target in target_list:
+                    if self.probe_gateway(host, nic, target.ip):
+                        break
         if nic.gateway is not None:
             log.info(f"    {host}/{nic.name} has gateway {nic.gateway}")
         else:
-            log.warning(f"    {host}/{nic.name} has no gateway")
+            log.warning(f"    {host}/{nic.name} has no dataplane gateway(s)")
         return  # gateway is set in nic, if it was found
 
     def probe_gateway(self, host, nic, target):
@@ -415,7 +548,7 @@ class WekaHostGroup():
                     nic.gateway = splitlines[2]
                     return True
         else:
-            log.debug(f"Error executing 'ip route get' on {host}:{nic.name}:" +
+            log.debug(f"Error executing 'ip route get {target} oif {nic.name}' on {host}:{nic.name}:" +
                       f" return code={cmd_output.status}," +
                       f" stderr={list(cmd_output.stderr)}")
         return False
@@ -441,6 +574,8 @@ class WekaHostGroup():
         ram = dict()  # dict of {ram_GB: [hosts]}
         drives = dict()  # dict of {num_drives: [hosts]}
         drive_sizes = dict()
+        nics = dict()
+        nic_names = dict()
         homo = True
 
         # loop through, make notes
@@ -472,6 +607,16 @@ class WekaHostGroup():
                     drive_size_hostlist.append(host)
                 drive_sizes[drive['sizeBytes']] = drive_size_hostlist
 
+            # check that they all have the same number of usable nics... ? not sure if this is right
+            num_nicslist = nics.get(len(host_obj.nics), list())
+            num_nicslist.append(str(host_obj))
+            nics[len(host_obj.nics)] = num_nicslist
+
+            for iface, nic in host_obj.nics.items():
+                nic_namelist = nic_names.get(iface, list())
+                nic_namelist.append(host_obj.name)
+                nic_names[iface] = nic_namelist
+
         if len(cores) != 1:
             homo = False
             log.error("Hosts do not have a homogeneous number of cores")
@@ -495,6 +640,12 @@ class WekaHostGroup():
             for num_drives, drivehostlist in sorted(drives.items()):
                 log.info(f"  There are {len(drivehostlist)} hosts with {num_drives} drives: {sorted(drivehostlist)}")
 
+        if len(nics) != 1:
+            homo = False
+            log.error("Hosts do not have a homogenous number of usable nics")
+            for num_nics, niclist in sorted(nics.items()):
+                log.info(f"  There are {len(niclist)} hosts with {num_nics} working dataplane NICs: {sorted(niclist)}")
+
         if len(drive_sizes) != 1:
             homo = False
             log.error("Hosts do not have a homogeneous drive sizes")
@@ -504,17 +655,22 @@ class WekaHostGroup():
                          f"{round(drive_size / 1024 / 1024 / 1024 / 1024, 2)} TiB " +
                          f"drives: {sorted(drivehostlist)}")
 
+        if len(self.networks) != len(nic_names):
+            homo = False
+            log.info(f"Hosts have varying network interface names")
+            for name, name_list in nic_names.items():
+                log.info(f"  interface {name}: {name_list}")
+
         return homo
 
-    def get_hostinfo(self):
+    def get_hardware_info(self):
         """
         # get info on the hosts
         :return:
         """
-        for host, host_obj in self.usable_hosts.items():
-            threaded_method(self, WekaHostGroup.lscpu, host_obj)
-
-        default_threader.run()
+        # Don't call ssh-using methods in parallel - can run the system out of ssh sessions
+        for host, host_obj in sorted(self.usable_hosts.items()):
+            host_obj.lscpu()
 
         for host, host_obj in self.usable_hosts.items():
             if 'Thread(s) per core' in host_obj.lscpu_data:
@@ -527,25 +683,6 @@ class WekaHostGroup():
                     log.debug(f"{host} hyperthreading/SMT is {host_obj.hyperthread}")
             else:
                 log.error(f"Host {host}: Unable to parse lscpu output - TPC not found")
-
-
-    def lscpu(self, hostobj):
-        hostobj.lscpu_data = dict()
-        cmd_output = self.ssh_client.run("lscpu")
-        if cmd_output.status == 0:
-            # we were able to run lscpu
-            outputlines = cmd_output.stdout.split('\n')
-            if len(outputlines) > 0:
-                log.debug(f"got lscpu output for {hostobj.name}")
-                for line in outputlines:
-                    splitlines = line.split(':')
-                    if len(splitlines) > 1:
-                        hostobj.lscpu_data[splitlines[0].strip()] = splitlines[1].strip()
-            else:
-                log.error(f"Host {hostobj.name}: Unable to parse lscpu output - no lines")
-
-        else:
-            log.error(f"lscpu failed on {hostobj.name}")
 
 
 def beacon_hosts(hostname):
@@ -562,7 +699,7 @@ def beacon_hosts(hostname):
         sys.exit(1)  # very hard error
 
     if not reference_host.host_api.STEMMode:
-        log.info(f"host {hostname} is already part of a cluster")
+        log.info(f"reference host {hostname} is already part of a cluster - aborting")
         sys.exit(1)
 
     # returns a dict of {ipaddr:hostname}
@@ -576,8 +713,9 @@ def beacon_hosts(hostname):
         else:
             stem_beacons[hostname].append(ip)
 
+    log.info("Beacons found:")
     for host, ips in stem_beacons.items():
-        log.info(f"{host}: {sorted(ips)}")
+        log.info(f"    {host}: {sorted(ips)}")
 
     return OrderedDict(sorted(stem_beacons.items()))
 

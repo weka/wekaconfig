@@ -43,6 +43,7 @@ if __name__ == '__main__':
     register_module("wekalib", logging.ERROR)
     register_module("urllib3", logging.ERROR)
     register_module("wekapyutils.wekassh", logging.ERROR)
+    register_module("wekapyutils.sthreads", logging.ERROR)
     configure_logging(log, args.verbosity)
 
     try:
@@ -59,7 +60,7 @@ if __name__ == '__main__':
         import platform
 
         args.host = platform.node()
-    print(f"target host is {args.host}")
+    print(f"reference host is {args.host}")
     print(f"collecting host data... please wait...")
     host_list = scan_hosts(args.host)
 
