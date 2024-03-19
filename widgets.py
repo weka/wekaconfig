@@ -537,7 +537,7 @@ class Networks(wekatui.TitleMultiSelect):
         for index in self.parent.dataplane_networks_field.value:
             # save the IPv4Network objects corresponding to the selected items
             #  find hosts on this network...
-            for iface, nic in PA.target_hosts.referencehost_obj.nics.items():
+            for iface, nic in PA.target_hosts.reference_host.nics.items():
                 if nic.network == PA.nets[index]:   # is this nic on that network?
                     PA.possible_hosts |= PA.target_hosts.accessible_hosts[nic.name]
                     #for host in PA.target_hosts.accessible_hosts[nic.name]:

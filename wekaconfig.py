@@ -18,7 +18,8 @@ log = logging.getLogger()
 if __name__ == '__main__':
     progname = sys.argv[0]
     parser = argparse.ArgumentParser(description="Weka Cluster Configurator")
-    parser.add_argument("host", type=str, nargs="?", help="a host to talk to", default="localhost")
+    parser.add_argument("hosts", type=str, nargs="*",
+                        help="a list of hosts to configure, or none to use cluster beacons", default=None)
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="increase output verbosity")
     parser.add_argument("--version", dest="version", default=False, action="store_true",
                         help="Display version number")
@@ -56,16 +57,11 @@ if __name__ == '__main__':
     os.environ["TERMINFO"] = f"{wd}/terminfo"  # we carry our own definition
     print(f"Setting TERMINFO to {os.environ['TERMINFO']}")
 
-    if args.host == "localhost":
-        import platform
-
-        args.host = platform.node()
-    print(f"reference host is {args.host}")
     print(f"collecting host data... please wait...")
-    host_list = scan_hosts(args.host)
+    host_list = scan_hosts(args.hosts)
 
     # pause here so the user can review what's happened before we go to full-screen mode
-    if len(host_list.referencehost_obj.nics) < 1:
+    if len(host_list.reference_host.nics) < 1:
         log.critical(f"There are no usable networks, aborting.")
         sys.exit(1)
     print(f"Scanning Complete.  Press Enter to continue: ", end='')
