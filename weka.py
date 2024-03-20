@@ -272,7 +272,7 @@ class STEMHost(object):
             return self.ssh_client.run(command, *args, **kwargs)
 
 
-class NamedDict(dict):
+class NamedDict(SortedDict):
     def __init__(self, *args, **kwargs):
         try:
             self._name = kwargs.pop('name')
@@ -284,20 +284,9 @@ class NamedDict(dict):
     def name(self):
         return self._name
 
-    #def __getattr__(self, item):
-    #    return self[item]
-
-    #def __setattr__(self, key, value):
-    #    self[key] = value
-
-    #def __delattr__(self, item):
-    #    del self[item]
-
-    #def __str__(self):
-    #    return f"{self.__class__.__name__}({super(NamedDict, self).__str__()})"
 
 class WekaHostGroup():
-    def __init__(self, beacons):
+    def __init__(self, beacons, weka_version):
         """
         This routine is run before the TUI starts to scope out the cluster.
 
@@ -305,7 +294,6 @@ class WekaHostGroup():
         The idea is to narrow down the beacons list to something that will work
         Then analyze the hosts (networks and whatnot) to see how we can configure things
 
-        :param reference_hostname: hostname of the starter host (given on command line)
         :param beacons: dict of hostname:[list of ip addrs]
         :return: a list of STEMHost objects
         """
@@ -314,26 +302,27 @@ class WekaHostGroup():
         self.local_subnets = list()
         self.isrouted = False
         self.one_network = False
-        self.usable_hosts = NamedDict(name="usable_hosts")
+        self.usable_hosts = SortedDict()
         self.accessible_hosts = SortedDict()  # a dict of {ifname:(hostname)}  (set of hostnames on the nic)
         self.pingable_ips = SortedDict()
         self.networks = SortedDict()
         self.reference_host = None
-        self.candidates = NamedDict(name="candidates")
+        self.candidates = SortedDict()
         self.rejected_hosts = SortedDict()
 
         default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
         self.beacons = beacons
+        self.weka_version = weka_version
 
         log.info(f"Getting configuration info from hosts...")
         self.create_candidates()
         log.debug(f"candidates = {list(self.candidates.keys())}")
 
-        self.open_candidate_api()
-        log.debug(f"candidates = {list(self.candidates.keys())}")
         self.scan_machine_info()
         log.debug(f"candidates = {list(self.candidates.keys())}")
         self.check_weka_release()
+        log.debug(f"candidates = {list(self.candidates.keys())}")
+        self.validate_nics()
         log.debug(f"candidates = {list(self.candidates.keys())}")
         self.explore_network()
         log.debug(f"candidates = {list(self.candidates.keys())}")
@@ -349,14 +338,12 @@ class WekaHostGroup():
         for host, reasons in self.rejected_hosts.items():
             summary_log.info(f"    {host}: {reasons}")
 
-    def reject_host(self, host_list, host, reason):
-        if type(host_list) is not NamedDict:
-            raise TypeError("host_list must be a NamedDict")
+    def reject_host(self, host, reason):
         try:
             log.debug(f"Rejecting {str(host)} - {reason}")
-            host_list.pop(str(host))
+            self.candidates.pop(str(host))
         except (KeyError, NameError):
-            log.debug(f"{str(host)} not in {host_list.name} list - adding to rejected list")
+            log.debug(f"{str(host)} not in candidates list - adding to rejected list")
         if str(host) in self.rejected_hosts.keys():
             log.debug(f"{str(host)} already rejected - adding reason")
             self.rejected_hosts[str(host)].append(reason)
@@ -364,7 +351,7 @@ class WekaHostGroup():
             self.rejected_hosts[str(host)] = [reason]
 
     def create_candidates(self):
-        # cycle through the beacon hosts, and fetch their HW info, create STEMHosts
+        #
         for host, ip_list in self.beacons.items():
             # if we're going to do this, we have to create the STEMHost object first, not below
             log.debug(f"creating candidate for {host}")
@@ -373,22 +360,26 @@ class WekaHostGroup():
             log.debug(f"opening api to {host}")
             threaded_method(candidate, STEMHost.open_api, ip_list)  # schedule to run (they're slow)
             self.candidates[host] = candidate
-            # candidate.open_api(ip_list)
         default_threader.run()  # run the threaded methods
 
         for host, candidate in self.candidates.copy().items():
             if candidate.host_api is None:
                 log.info(f"Unable to communicate with {host} API - skipping")
-                self.reject_host(self.candidates, candidate, "Unable to communicate with API")
-                continue
+                self.reject_host(candidate, "Unable to communicate with API")
 
+    """
     def open_candidate_api(self):
         # weed out the ones we can't talk to or reach
+        for host, candidate in self.candidates.items():
+            log.debug(f"opening api to {host}")
+            threaded_method(candidate, STEMHost.open_api, ip_list)  # schedule to run (they're slow)
+        default_threader.run()  # run the threaded methods
+
         for host, candidate in self.candidates.copy().items():
             if candidate.host_api is None:
                 log.info(f"Unable to communicate with {host} API - skipping")
-                self.reject_host(self.candidates, candidate, "Unable to communicate with API")
-
+                self.reject_host(candidate, "Unable to communicate with API")
+    """
 
     def scan_machine_info(self):
         log.debug(f"Getting machine info from hosts...")
@@ -397,12 +388,69 @@ class WekaHostGroup():
         for candidate in self.candidates.copy().values():
             if candidate.machine_info is None:
                 log.error(f"Error communicating with {candidate.name} - removing from list")
-                self.reject_host(self.candidates, candidate, "Unable to fetch machine info")
+                self.reject_host(candidate, "Unable to fetch machine info")
                 continue
         log.debug(f"Got machine info from {list(self.candidates.keys())}")
 
+    def validate_nics(self):
         parallel(self.candidates.values(), STEMHost.validate_nics)
 
+        """
+        # find the localhost (reference_host) in the candidates list (a STEMHost object)
+        self.local_ips = get_local_ips()
+        self.reference_host = None
+        for ip in self.local_ips:
+            for candidate in self.candidates.values():
+                candidate_ips = [str(iface.ip) for iface in candidate.nics.values()]
+                if ip in candidate_ips:
+                    self.reference_host = candidate
+                    candidate.is_reference = True
+                    break
+            if self.reference_host is not None:
+                break
+        if self.reference_host is None:
+            log.error(f"Unable to find local host in candidates list")
+            sys.exit(1)
+        """
+
+    def check_weka_release(self):
+        # find hosts that can cluster with reference_hostname - they pointed us at reference_hostname for a reason
+        log.info(f"Localhost is running WEKA version {self.weka_version}")
+        log.info(f"Searching for other {self.weka_version} hosts...")
+        for host, candidate in self.candidates.copy().items():  # copy it so we can del() from orig list
+            if candidate.version != self.weka_version:
+                log.info(f"    host {host} is not running v{self.weka_version} - removing from list")
+                self.reject_host(candidate,
+                             f"Host is running {candidate.version} - not compatible with {self.weka_version}")
+                continue
+            else:
+                log.debug(f"    host {host} is running {self.weka_version}")
+            #log.info(f"Host {host} added to list of possible cluster hosts")
+
+    def check_weka_release_old(self):
+        # find hosts that can cluster with reference_hostname - they pointed us at reference_hostname for a reason
+        log.info(f"Reference Host {self.reference_host.name} is running WEKA release {self.reference_host.version}")
+        log.info(f"Searching for other {self.reference_host.version} hosts...")
+        for host, candidate in self.candidates.copy().items():  # copy it so we can del() from orig list
+            if candidate.machine_info is None:
+                log.error(f"Error communicating with {host} - removing from list")
+                self.reject_host(candidate, "Error communicating with host - lacks machine info")
+                continue
+            elif candidate.version != self.reference_host.version:
+                log.info(f"    host {host} is not running v{self.reference_host.version} - removing from list")
+                self.reject_host(candidate,
+                        f"Host is running {candidate.version} - not compatible with {self.reference_host.version}")
+                continue
+            else:
+                #candidate.validate_nics()
+                if len(candidate.nics) == 0:
+                    log.error(f"{host} has no usable nics?  Skipping...")
+                    self.reject_host(candidate, "No usable nics")
+                    continue
+            log.info(f"Host {host} added to list of possible cluster hosts")
+
+    def explore_network(self):
+        log.info("Preparing to explore network...")
 
         # find the localhost (reference_host) in the candidates list (a STEMHost object)
         self.local_ips = get_local_ips()
@@ -419,32 +467,6 @@ class WekaHostGroup():
         if self.reference_host is None:
             log.error(f"Unable to find local host in candidates list")
             sys.exit(1)
-
-    def check_weka_release(self):
-        # find hosts that can cluster with reference_hostname - they pointed us at reference_hostname for a reason
-        log.info(f"Reference Host {self.reference_host.name} is running WEKA release {self.reference_host.version}")
-        log.info(f"Searching for other {self.reference_host.version} hosts...")
-        for host, candidate in self.candidates.copy().items():  # copy it so we can del() from orig list
-            if candidate.machine_info is None:
-                log.error(f"Error communicating with {host} - removing from list")
-                self.reject_host(self.candidates, candidate, "Error communicating with host - lacks machine info")
-                continue
-            elif candidate.version != self.reference_host.version:
-                log.info(f"    host {host} is not running v{self.reference_host.version} - removing from list")
-                self.reject_host(self.candidates, candidate,
-                        f"Host is running {candidate.version} - not compatible with {self.reference_host.version}")
-                continue
-            else:
-                #candidate.validate_nics()
-                if len(candidate.nics) == 0:
-                    log.error(f"{host} has no usable nics?  Skipping...")
-                    self.reject_host(self.candidates, candidate, "No usable nics")
-                    continue
-            log.info(f"Host {host} added to list of possible cluster hosts")
-
-    def explore_network(self):
-        log.info("Preparing to explore network...")
-
         # make sure reference_hostname can talk to the others over the dataplane networks; narrow the list,
         # and collect details of what weka hosts we can see on each nic
         # self.accessible_hosts = dict()  # a dict of {ifname:(hostname)}  (set of hostnames on the nic)
@@ -560,7 +582,6 @@ class WekaHostGroup():
                     else:
                         log.info(f"{host_obj.name} appears to have source-based routing set up")
 
-
     def ping_clients(self, source_interface, hostobj, targetip):
         """
         # ping the target host interface from the reference host (may be more than one interface per)
@@ -577,6 +598,7 @@ class WekaHostGroup():
 
         # run locally
         import subprocess
+        log.debug(f"running:  ping -c1 -W1 -I {source_interface} {targetip.ip}")
         ssh_out = subprocess.run(f"ping -c1 -W1 -I {source_interface} {targetip.ip}", shell=True, capture_output=True, text=True)
         if ssh_out.returncode == 0:
             log.debug(f"Ping from {self.reference_host.name}/{source_interface} to target {hostname}/{targetip} successful - adding {hostname} to accessible_hosts")
@@ -785,7 +807,6 @@ def beacon_hosts():
     for host, ips in stem_beacons.items():
         log.info(f"    {host}: {sorted(ips)}")
 
-    #return SortedDict(sorted(stem_beacons.items()))
     return stem_beacons
 
 
@@ -795,7 +816,21 @@ def scan_hosts(hostlist):
     :param reference_hostname: str
     :return: a dict containing the valid STEMHost objects
     """
-    #reference_hostname = socket.gethostname()
+    # make sure we can talk to the local weka container
+    this_host = STEMHost("localhost")
+    this_host.open_api([this_host.name])
+    if this_host.host_api is None:
+        log.info(f"ERROR: Unable to contact host '{this_host.name}' via API")
+        sys.exit(1)  # very hard error
+
+    # get the weka version
+    this_host.get_machine_info()
+    if this_host.machine_info is None:
+        log.info(f"ERROR: Error getting machine info from '{this_host.name}' via API")
+        sys.exit(1)  # very hard error
+
+    weka_version = this_host.version
+
     errors = False
     if len(hostlist) == 0:
         log.info("looking for WEKA beacons on localhost")
@@ -826,7 +861,7 @@ def scan_hosts(hostlist):
             sys.exit(1)
 
     log.info(f"list of potential WEKA hosts: {list(stem_beacons.keys())}")
-    hostgroup = WekaHostGroup(stem_beacons)
+    hostgroup = WekaHostGroup(stem_beacons, weka_version)
     log.info("************************** Analysis **************************")
     if not hostgroup.is_homogeneous():
         log.info("Host group is not Homogeneous!  Please verify configuration(s)")
