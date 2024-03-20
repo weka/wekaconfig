@@ -5,3 +5,4 @@ urllib3~=1.26.8
 wekapyutils
 pyinstaller
 netifaces
+sortedcontainers
