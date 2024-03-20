@@ -29,23 +29,46 @@ if __name__ == '__main__':
         print(f"{progname} version 2024.03.18")
         sys.exit(0)
 
-    if args.verbosity == 1:
-        weka_debug = logging.INFO
-    elif args.verbosity >= 2:
-        weka_debug = logging.DEBUG
+    if args.verbosity == 0:
+        loglevel = logging.INFO
+    elif args.verbosity == 1:
+        loglevel = logging.DEBUG
     else:
-        weka_debug = DEFAULT
-    register_module("weka", weka_debug)
+        loglevel = logging.DEBUG
 
-    register_module("paramiko", logging.ERROR)
-    register_module("widgets", DEFAULT)
-    register_module("logic", DEFAULT)
-    register_module("forms", DEFAULT)
-    register_module("wekalib", logging.ERROR)
-    register_module("urllib3", logging.ERROR)
-    register_module("wekapyutils.wekassh", logging.ERROR)
-    register_module("wekapyutils.sthreads", logging.ERROR)
-    configure_logging(log, args.verbosity)
+    # set up logging
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(loglevel)
+    console_handler.setFormatter(logging.Formatter("%(levelname)s:%(message)s"))
+    log.addHandler(console_handler)
+
+    # add a new logging handler to capture all output to a file
+    logfile_handler = logging.FileHandler("wekaconfig.log")
+    logfile_handler.setLevel(logging.DEBUG)
+    logfile_handler.setFormatter(logging.Formatter(
+        "%(asctime)s:%(filename)s:%(lineno)s:%(funcName)s():%(levelname)s:%(message)s"))
+    log.addHandler(logfile_handler)
+
+    # set the logging level for the root logger - this will be the default for all submodules
+    log.setLevel(logging.DEBUG)
+
+    # set submodule logging levels - let them be quiet
+    logging.getLogger("paramiko").setLevel(logging.ERROR)
+    logging.getLogger("wekalib").setLevel(logging.ERROR)
+    logging.getLogger("urllib3").setLevel(logging.ERROR)
+    logging.getLogger("wekapyutils.wekassh").setLevel(logging.ERROR)
+    logging.getLogger("wekapyutils.sthreads").setLevel(logging.ERROR)
+
+    # local modules
+    #logging.getLogger("weka").setLevel(loglevel)
+    #logging.getLogger("logic").setLevel(DEFAULT)
+    #logging.getLogger("forms").setLevel(DEFAULT)
+    #logging.getLogger("widgets").setLevel(DEFAULT)
+
+    # add a new logging handler so we can log summary messages to a file, but not to the console
+    summary_log = logging.getLogger("summary")
+    summary_log.addHandler(logfile_handler)
+    summary_log.propagate = False
 
     try:
         wd = sys._MEIPASS  # for PyInstaller - this is the temp dir where we are unpacked
@@ -58,6 +81,7 @@ if __name__ == '__main__':
     print(f"Setting TERMINFO to {os.environ['TERMINFO']}")
 
     print(f"collecting host data... please wait...")
+    log.info("*******************  Starting Weka Configurator  *******************")
     host_list = scan_hosts(args.hosts)
 
     # pause here so the user can review what's happened before we go to full-screen mode
