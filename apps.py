@@ -55,7 +55,7 @@ class WekaConfigApp(wekatui.NPSAppManaged):
         self.dedicated = None
         self.auto_failure_domain = None
         self.cloud_enable = None
-        self.weka_ver = hostgroup.referencehost_obj.version.split('.')
+        self.weka_ver = hostgroup.reference_host.version.split('.')
         if int(self.weka_ver[0]) < 4:
             self.Multicontainer = False
         else:

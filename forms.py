@@ -483,7 +483,7 @@ class SelectHostsForm(CancelNextForm):
         # need to account for 2 nics on same network... self.one_network...
         temp_list = list()
         iface_dict = dict()
-        for iface, nic in sorted(hostlist.referencehost_obj.nics.items()):
+        for iface, nic in sorted(hostlist.reference_host.nics.items()):
             if nic.network.exploded not in temp_list:
                 temp_list.append(nic.network.exploded)
                 iface_dict[iface] = nic

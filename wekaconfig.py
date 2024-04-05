@@ -18,32 +18,57 @@ log = logging.getLogger()
 if __name__ == '__main__':
     progname = sys.argv[0]
     parser = argparse.ArgumentParser(description="Weka Cluster Configurator")
-    parser.add_argument("host", type=str, nargs="?", help="a host to talk to", default="localhost")
+    parser.add_argument("hosts", type=str, nargs="*",
+                        help="a list of hosts to configure, or none to use cluster beacons", default=None)
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="increase output verbosity")
     parser.add_argument("--version", dest="version", default=False, action="store_true",
                         help="Display version number")
     args = parser.parse_args()
 
     if args.version:
-        print(f"{progname} version 2.3.6")
+        print(f"{progname} version 2024.03.18")
         sys.exit(0)
 
-    if args.verbosity == 1:
-        weka_debug = logging.INFO
-    elif args.verbosity >= 2:
-        weka_debug = logging.DEBUG
+    if args.verbosity == 0:
+        loglevel = logging.INFO
+    elif args.verbosity == 1:
+        loglevel = logging.DEBUG
     else:
-        weka_debug = DEFAULT
-    register_module("weka", weka_debug)
+        loglevel = logging.DEBUG
 
-    register_module("paramiko", logging.ERROR)
-    register_module("widgets", DEFAULT)
-    register_module("logic", DEFAULT)
-    register_module("forms", DEFAULT)
-    register_module("wekalib", logging.ERROR)
-    register_module("urllib3", logging.ERROR)
-    register_module("wekapyutils.wekassh", logging.ERROR)
-    configure_logging(log, args.verbosity)
+    # set up logging
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(loglevel)
+    console_handler.setFormatter(logging.Formatter("%(levelname)s:%(message)s"))
+    log.addHandler(console_handler)
+
+    # add a new logging handler to capture all output to a file
+    logfile_handler = logging.FileHandler("wekaconfig.log")
+    logfile_handler.setLevel(logging.DEBUG)
+    logfile_handler.setFormatter(logging.Formatter(
+        "%(asctime)s:%(filename)s:%(lineno)s:%(funcName)s():%(levelname)s:%(message)s"))
+    log.addHandler(logfile_handler)
+
+    # set the logging level for the root logger - this will be the default for all submodules
+    log.setLevel(logging.DEBUG)
+
+    # set submodule logging levels - let them be quiet
+    logging.getLogger("paramiko").setLevel(logging.ERROR)
+    logging.getLogger("wekalib").setLevel(logging.ERROR)
+    logging.getLogger("urllib3").setLevel(logging.ERROR)
+    logging.getLogger("wekapyutils.wekassh").setLevel(logging.ERROR)
+    logging.getLogger("wekapyutils.sthreads").setLevel(logging.ERROR)
+
+    # local modules
+    #logging.getLogger("weka").setLevel(loglevel)
+    #logging.getLogger("logic").setLevel(DEFAULT)
+    #logging.getLogger("forms").setLevel(DEFAULT)
+    #logging.getLogger("widgets").setLevel(DEFAULT)
+
+    # add a new logging handler so we can log summary messages to a file, but not to the console
+    summary_log = logging.getLogger("summary")
+    summary_log.addHandler(logfile_handler)
+    summary_log.propagate = False
 
     try:
         wd = sys._MEIPASS  # for PyInstaller - this is the temp dir where we are unpacked
@@ -55,16 +80,12 @@ if __name__ == '__main__':
     os.environ["TERMINFO"] = f"{wd}/terminfo"  # we carry our own definition
     print(f"Setting TERMINFO to {os.environ['TERMINFO']}")
 
-    if args.host == "localhost":
-        import platform
-
-        args.host = platform.node()
-    print(f"target host is {args.host}")
     print(f"collecting host data... please wait...")
-    host_list = scan_hosts(args.host)
+    log.info("*******************  Starting Weka Configurator  *******************")
+    host_list = scan_hosts(args.hosts)
 
     # pause here so the user can review what's happened before we go to full-screen mode
-    if len(host_list.referencehost_obj.nics) < 1:
+    if len(host_list.reference_host.nics) < 1:
         log.critical(f"There are no usable networks, aborting.")
         sys.exit(1)
     print(f"Scanning Complete.  Press Enter to continue: ", end='')

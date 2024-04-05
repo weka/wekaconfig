@@ -18,7 +18,6 @@ para() {
 	TF=$1; shift
 	echo $*
 	$* &
-	#[ !$TF ] && { echo para waiting; wait; }
 	[ $TF == "FALSE" ] && { echo para waiting; wait; }
 }
 
@@ -71,12 +70,6 @@ class WekaCluster(object):
                     if iface in self.config.target_hosts.pingable_ips[name]:  # list of ips accessible via the interface
                         host.this_hosts_ifs.add(iface)
 
-            #for interface in self.config.selected_dps:
-            #    iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
-            #    for host_int, nic in host.nics.items():
-            #        if nic in iplist:
-            #            this_hosts_ifs.add(nic)
-
             temp = str()
             for nic in host.this_hosts_ifs:
                 if count > 0:
@@ -91,40 +84,6 @@ class WekaCluster(object):
             temp = str()
         return host_names, host_ips
 
-    def _create_old(self):  # old version
-        output = 'create '
-        # hostnames
-        hostid = 0
-        for hostname, host in sorted(self.config.selected_hosts.items()):
-            output += hostname + ' '
-            host.host_id = hostid
-            hostid += 1
-
-        # host-ips
-        # what if ha/non-ha and same subnet?   They'll all show up in one "network"
-        # if self.config.HighAvailability:
-        output += "--host-ips="
-        for hostname, host in sorted(self.config.selected_hosts.items()):
-            this_hosts_ifs = set()
-            count = 0
-            for interface in self.config.selected_dps:
-                iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
-                for host_int, nic in host.nics.items():
-                    if nic in iplist:
-                        this_hosts_ifs.add(nic)
-
-            for nic in this_hosts_ifs:
-                if count > 0:
-                    if self.config.HighAvailability:
-                        output += '+'
-                    else:
-                        continue  # not HA, but has more than one NIC on the same network
-                output += nic.ip.exploded
-                count += 1
-            output += ','
-
-        result = output[:-1] if output[-1] == ',' else output
-        return result
 
     # returns a list of strings
     def _get_nics(self, hostname):  # for MCB... need a list of nics for a host
@@ -132,26 +91,8 @@ class WekaCluster(object):
         # host_id = 0
         result = list()
         host = self.config.selected_hosts[hostname]
-        #this_hosts_ifs = set()
-        # a dp may have multiple interfaces on it
-
-        #for host_int, nic in host.nics.items():
-        #    if nic.network in self.config.selected_dps and nic.ip in self.config.target_hosts.pingable_ips:
-        #        this_hosts_ifs.add(nic)
-
-        #for interface in self.config.selected_dps:
-        #    iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
-        #    for host_int, nic in host.nics.items():
-        #        if nic in iplist:
-        #            this_hosts_ifs.add(nic)
 
         for nic in sorted(list(host.this_hosts_ifs)):
-            # if nic.gateway is not None:
-            #    gateway = f"--gateway={nic.gateway}"
-            # else:
-            #    gateway = ''
-            # thishost = f"{base} {host.host_id} {nic.name} --netmask={nic.network.prefixlen} {gateway}"
-            # fullname = f"{nic.name}/{nic.network.prefixlen}"
             if nic.gateway is not None:
                 fullname = f"{nic.name}/{nic.ip.exploded}/{nic.network.prefixlen}/{nic.gateway}"
             else:
@@ -165,13 +106,6 @@ class WekaCluster(object):
         # host_id = 0
         result = list()
         for hostname, host in sorted(self.config.selected_hosts.items()):
-            #this_hosts_ifs = set()
-            #for interface in self.config.selected_dps:
-            #    iplist = self.config.target_hosts.pingable_ips[interface]  # list of ips accessible via the interface
-            #    for host_int, nic in host.nics.items():
-            #        if nic in iplist:
-            #            this_hosts_ifs.add(nic)
-
             for nic in sorted(list(host.this_hosts_ifs)):
                 if nic.gateway is not None:
                     gateway = f"--gateway={nic.gateway}"
@@ -293,13 +227,20 @@ class WekaCluster(object):
 
             for host in host_names:
                 fp.write(f"echo Stopping weka on {host}" + NL)
-                fp.write(PARA + f'scp -p ./resources_generator.py {host}:/tmp/' + NL)
-                fp.write(PARA + f'ssh {host} "sudo weka local stop; sudo weka local rm -f default"' + NL)
+                if self.config.target_hosts.candidates[host].is_reference:
+                    fp.write(PARA + f'cp ./resources_generator.py /tmp/' + NL)
+                    fp.write(PARA + f'sudo weka local stop; sudo weka local rm -f default' + NL)
+                else:
+                    fp.write(PARA + f'scp -p ./resources_generator.py {host}:/tmp/' + NL)
+                    fp.write(PARA + f'ssh {host} "sudo weka local stop; sudo weka local rm -f default"' + NL)
 
             fp.write(NL + 'wait' + NL)
             for host in host_names:
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
-                fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
+                if self.config.target_hosts.candidates[host].is_reference:
+                    fp.write(PARA + f'sudo /tmp/resources_generator.py -f --path /tmp --net')
+                else:
+                    fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
                 net_names = self._get_nics(host)
                 for name in net_names:
                     fp.write(f" {name}")
@@ -319,8 +260,12 @@ class WekaCluster(object):
             # start DRIVES container
             for host in host_names:
                 fp.write(f"echo Starting Drives container on server {host}" + NL)
-                fp.write(PARA + f'ssh {host} "sudo weka local setup {CONTAINER}' +
-                         f' --name drives0 --resources-path /tmp/drives0.json"' + NL)
+                if self.config.target_hosts.candidates[host].is_reference:
+                    fp.write(PARA + f'sudo weka local setup {CONTAINER}' +
+                             f' --name drives0 --resources-path /tmp/drives0.json' + NL)
+                else:
+                    fp.write(PARA + f'ssh {host} "sudo weka local setup {CONTAINER}' +
+                             f' --name drives0 --resources-path /tmp/drives0.json"' + NL)
 
             # wait for parallel commands to finish
             fp.write(NL + 'wait' + NL)
@@ -345,7 +290,14 @@ class WekaCluster(object):
                 hostid = 0
                 for host in host_names:  # not sure
                     fp.write(f"echo Starting drives container {container} on host {host}" + NL)
-                    fp.write(PARA + f'ssh {host} sudo ' + WLSC +
+                    if self.config.target_hosts.candidates[host].is_reference:
+                        fp.write(PARA + 'sudo ' + WLSC +
+                                 f' --name drives{container}' +
+                                 f' --resources-path /tmp/drives{container}.json' +
+                                 f' --join-ips={host_ips_string}' +
+                                 f' --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
+                    else:
+                        fp.write(PARA + f'ssh {host} sudo ' + WLSC +
                              f' --name drives{container}' +
                              f' --resources-path /tmp/drives{container}.json' +
                              f' --join-ips={host_ips_string}' +
@@ -360,7 +312,14 @@ class WekaCluster(object):
                 hostid = 0
                 for host in host_names:  # not sure
                     fp.write(f"echo Starting Compute container {container} on host {host}" + NL)
-                    fp.write(PARA + f'ssh {host} sudo ' + WLSC +
+                    if self.config.target_hosts.candidates[host].is_reference:
+                        fp.write(PARA + 'sudo ' + WLSC +
+                                 f' --name compute{container}' +
+                                 f' --resources-path /tmp/compute{container}.json' +
+                                 f' --join-ips={host_ips_string}' +
+                                 f' --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
+                    else:
+                        fp.write(PARA + f'ssh {host} sudo ' + WLSC +
                              f' --name compute{container}' +
                              f' --resources-path /tmp/compute{container}.json' +
                              f' --join-ips={host_ips_string}' +
@@ -393,7 +352,11 @@ class WekaCluster(object):
             hostid = 0
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Front container on host {host}" + NL)
-                fp.write(PARA +
+                if self.config.target_hosts.candidates[host].is_reference:
+                    fp.write(PARA + 'sudo ' + WLSC + ' --name frontend0 --resources-path /tmp/frontend0.json ' +
+                             f'--join-ips={host_ips_string} --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
+                else:
+                    fp.write(PARA +
                          f'ssh {host} sudo ' + WLSC + ' --name frontend0 --resources-path /tmp/frontend0.json ' +
                          f'--join-ips={host_ips_string} --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
                 hostid += 1
