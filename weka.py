@@ -108,19 +108,30 @@ class STEMHost(object):
                 del self.drives[drive['parentName']]
 
     def validate_nics(self):
+
+
+
+
         for net_adapter in self.machine_info['net']['interfaces']:
             if net_adapter['name'] == 'lo':  # we can't use loopback interfaces anyway
                 continue
-            details = self.find_interface_details(net_adapter['name'])
-            if details is None:
-                log.debug(f"no details available for {self.name}/{net_adapter['name']} on host '{self.name}' - skipping")
-                continue
-            if not (details['validationCode'] == "OK" and details['linkDetected']):
-                log.debug(f"Skipping interface {self.name}/{net_adapter['name']} - down or not validated")
+
+            # not right here
+            #details = self.find_interface_details(net_adapter['name'])
+            #if details is None:
+                #log.debug(f"no details available for {self.name}/{net_adapter['name']} on host '{self.name}' - skipping")
+            #    continue
+            #if not (details['validationCode'] == "OK" and details['linkDetected']):
+            #    log.debug(f"Skipping interface {self.name}/{net_adapter['name']} - down or not validated")
+            #    continue
+
+
+            # skip bond slaves - we'll get these from the bond (below)
+            if net_adapter['bondType'] == 'SLAVE':
+                log.debug(f'{self.name}: Skipping interface {self.name}/{net_adapter["name"]} - is a slave to a bond')
                 continue
 
-            # (bruce) change lowest allowed mtu to 1400 - we technically support 2k on ib
-            # and in theory support 1500 on eth, so don't abort without options for low MTUs
+            # Check MTU
             if net_adapter['linkLayer'] == 'IB':
                 if net_adapter['mtu'] != 2048 and net_adapter['mtu'] != 4092:
                     log.debug(f'{self.name}: Skipping {self.name}/{net_adapter["name"]} due to unsupported MTU:{net_adapter["mtu"]}')
@@ -131,23 +142,21 @@ class STEMHost(object):
                         f'{self.name}: Skipping {self.name}/{net_adapter["name"]} due to MTU {net_adapter["mtu"]} out of range')
                     continue
 
+            # make sure it has an ipv4 address
             if len(net_adapter['ip4']) <= 0:
                 log.debug(f'{self.name}: Skipping interface {self.name}/{net_adapter["name"]} - unconfigured')
                 continue
 
-            if net_adapter['bondType'] == 'SLAVE':
-                log.debug(f'{self.name}: Skipping interface {self.name}/{net_adapter["name"]} - is a slave to a bond')
-                continue
-
             if net_adapter['bondType'] == 'NONE':  # "NONE", "BOND" and "SLAVE" are valid
-
+                details = self.find_interface_details(net_adapter['name'])
+                if details is None:
+                    continue    # skip it... there's some problem with it (debugs in find_interface_details)
                 self.nics[net_adapter['name']] = WekaInterface(net_adapter['linkLayer'],
                                                                    net_adapter['name'],
                                                                    f"{net_adapter['ip4']}/{net_adapter['ip4Netmask']}",
                                                                    details['speedMbps'])
                 log.info(f"{self.name}: interface {self.name}/{net_adapter['name']} added to config")
-                #else:
-                #   log.debug(f"{self.name}: interface {net_adapter['name']} is down - skipping")
+
             elif net_adapter['bondType'][:4] == 'BOND':  # can be "BOND_MLTI_NIC" or whatever.  Same diff to us
                 # bonds don't appear in the net_adapters... have to build it from the slaves
                 if len(net_adapter['name_slaves']) == 0:  # what are other values?
@@ -158,18 +167,15 @@ class STEMHost(object):
                 for slave in net_adapter['name_slaves']:
                     slave_details = self.find_interface_details(slave)
                     if slave_details is None:
-                        log.error(f"no details available for slave interface {slave} on host '{self.name}' - skipping")
+                        log.error(f"issue with slave interface {slave} on host '{self.name}' - skipping")
                         continue
-                    if slave_details['validationCode'] == "OK" and slave_details['linkDetected']:
-                        log.info(f"{self.name}: {net_adapter['name']}: slave {slave_details['ethName']} good.")
-                        self.nics[net_adapter['name']] = \
+                    log.info(f"{self.name}: {net_adapter['name']}: slave {slave_details['ethName']} good.")
+                    self.nics[net_adapter['name']] = \
                             WekaInterface(net_adapter['linkLayer'], net_adapter['name'],
                                           f"{net_adapter['ip4']}/{net_adapter['ip4Netmask']}", slave_details['speedMbps'])
-                        log.info(f"{self.name}: bond {net_adapter['name']} added to config")
+                    log.info(f"{self.name}: bond {net_adapter['name']} added to config")
                         # we don't care about other slaves once we find a working one - they should all be the same
-                        break
-                    else:
-                        log.info(f"{self.name}: bond {net_adapter['name']} is down - skipping")
+                    break   # break?
                 log.error(f"{self.name}: bond {net_adapter['name']} has no up slaves - skipping")
             else:
                 log.info(f"{self.name}:{net_adapter['name']} - unknown bond type {net_adapter['bondType']}")
@@ -177,8 +183,12 @@ class STEMHost(object):
     def find_interface_details(self, iface):
         for eth in self.machine_info['eths']:
             if eth['interface_alias'] == iface or eth['ethName'] == iface:  # changed interface_alias in newer releases
+                if not (eth['validationCode'] == "OK" and eth['linkDetected']):
+                    log.debug(f"Skipping interface {self.name}/{iface} - down or not validated")
+                    return None   # not good/usable
                 return eth
-        return None
+        log.debug(f"Skipping interface {self.name}/{iface} - not in eths")
+        return None  # not found
 
     def open_api(self, ip_list=None):
         """
