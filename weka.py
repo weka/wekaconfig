@@ -108,23 +108,9 @@ class STEMHost(object):
                 del self.drives[drive['parentName']]
 
     def validate_nics(self):
-
-
-
-
         for net_adapter in self.machine_info['net']['interfaces']:
             if net_adapter['name'] == 'lo':  # we can't use loopback interfaces anyway
                 continue
-
-            # not right here
-            #details = self.find_interface_details(net_adapter['name'])
-            #if details is None:
-                #log.debug(f"no details available for {self.name}/{net_adapter['name']} on host '{self.name}' - skipping")
-            #    continue
-            #if not (details['validationCode'] == "OK" and details['linkDetected']):
-            #    log.debug(f"Skipping interface {self.name}/{net_adapter['name']} - down or not validated")
-            #    continue
-
 
             # skip bond slaves - we'll get these from the bond (below)
             if net_adapter['bondType'] == 'SLAVE':
