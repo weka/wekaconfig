@@ -228,8 +228,9 @@ class WekaCluster(object):
             for host in host_names:
                 fp.write(f"echo Stopping weka on {host}" + NL)
                 if self.config.target_hosts.candidates[host].is_reference:
-                    fp.write(PARA + f'cp ./resources_generator.py /tmp/' + NL)
-                    fp.write(PARA + f'sudo weka local stop; sudo weka local rm -f default' + NL)
+                    fp.write(PARA + 'cp ./resources_generator.py /tmp/' + NL)
+                    fp.write('sudo weka local stop' + NL)
+                    fp.write(PARA + 'sudo weka local rm -f default' + NL)
                 else:
                     fp.write(PARA + f'scp -p ./resources_generator.py {host}:/tmp/' + NL)
                     fp.write(PARA + f'ssh {host} "sudo weka local stop; sudo weka local rm -f default"' + NL)
@@ -238,7 +239,7 @@ class WekaCluster(object):
             for host in host_names:
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
                 if self.config.target_hosts.candidates[host].is_reference:
-                    fp.write(PARA + f'sudo /tmp/resources_generator.py -f --path /tmp --net')
+                    fp.write(PARA + 'sudo /tmp/resources_generator.py -f --path /tmp --net')
                 else:
                     fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
                 net_names = self._get_nics(host)
