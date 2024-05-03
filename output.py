@@ -62,12 +62,17 @@ class WekaCluster(object):
             host.host_id = hostid
             hostid += 1
 
+            # make an uber list of pingable ips
+            all_pingable_ips = set()
+            for iface in self.config.target_hosts.pingable_ips.values():
+                all_pingable_ips.update(iface)
+
             host.this_hosts_ifs = set()
             count = 0
             # select the interfaces that are on the selected networks
             for name, iface in host.nics.items():
                 if iface.network in self.config.selected_dps:
-                    if iface in self.config.target_hosts.pingable_ips[name]:  # list of ips accessible via the interface
+                    if iface in all_pingable_ips:  # list of ips accessible
                         host.this_hosts_ifs.add(iface)
 
             temp = str()
