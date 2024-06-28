@@ -562,9 +562,11 @@ class WekaHostGroup():
         log.info("Probing for gateways")
         for host, host_obj in self.usable_hosts.items():
             for nicname, nic_obj in host_obj.nics.items():
-                # threaded_method(host_obj, WekaHostGroup.get_gateways, host_obj, nic_obj)
                 if nic_obj.type != "IB":  # we don't support gateways on IB
-                    self.get_gateways(host_obj, nic_obj)
+                    threaded_method(self, WekaHostGroup.get_gateways, host_obj, nic_obj)
+                    #self.get_gateways(host_obj, nic_obj)
+
+        default_threader.run()   # update host object with gateway info
 
         # check if they need source-based routing and see if they have it set up
         if self.one_network:
