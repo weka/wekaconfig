@@ -67,8 +67,9 @@ class WekaCluster(object):
             # select the interfaces that are on the selected networks
             for name, iface in host.nics.items():
                 if iface.network in self.config.selected_dps:
-                    if iface in self.config.target_hosts.pingable_ips[name]:  # list of ips accessible via the interface
-                        host.this_hosts_ifs.add(iface)
+                    for pingable in self.config.target_hosts.pingable_ips.values():  # it's a dict of interface:[list of ips]
+                        if iface in pingable:  # list of ips accessible via the interface
+                            host.this_hosts_ifs.add(iface)
 
             temp = str()
             for nic in host.this_hosts_ifs:
