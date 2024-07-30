@@ -119,7 +119,7 @@ class STEMHost(object):
 
             # Check MTU
             if net_adapter['linkLayer'] == 'IB':
-                if net_adapter['mtu'] != 2048 and net_adapter['mtu'] != 4092:
+                if net_adapter['mtu'] != 2044 and net_adapter['mtu'] != 4092:
                     log.debug(f'{self.name}: Skipping {self.name}/{net_adapter["name"]} due to unsupported MTU:{net_adapter["mtu"]}')
                     continue
             elif net_adapter['linkLayer'] == 'ETH':

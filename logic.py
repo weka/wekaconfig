@@ -13,9 +13,9 @@ class Cores:
         self.MCB = MCB
         self.total = total_cores
         self.num_actual_drives = num_drives
-        self.res_os = 2  # reserved for OS
+        self.res_os = 4  # reserved for OS
         self.res_proto = 0  # reserved for protocols
-        self.fe = 2  # a reasonable default
+        self.fe = 1  # a reasonable default
         self.drives = num_drives    # start with 1:1 ratio
         self.compute = 0    # will recalc
         self.usable = 0  # will recalc

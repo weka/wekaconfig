@@ -62,14 +62,19 @@ class WekaCluster(object):
             host.host_id = hostid
             hostid += 1
 
+            # make an uber list of pingable ips
+            all_pingable_ips = set()
+            for iface in self.config.target_hosts.pingable_ips.values():
+                all_pingable_ips.update(iface)
+
             host.this_hosts_ifs = set()
             count = 0
             # select the interfaces that are on the selected networks
             for name, iface in host.nics.items():
                 if iface.network in self.config.selected_dps:
-                    for pingable in self.config.target_hosts.pingable_ips.values():  # it's a dict of interface:[list of ips]
-                        if iface in pingable:  # list of ips accessible via the interface
-                            host.this_hosts_ifs.add(iface)
+                    if iface in all_pingable_ips:  # list of ips accessible
+                        host.this_hosts_ifs.add(iface)
+
 
             temp = str()
             for nic in host.this_hosts_ifs:
@@ -229,8 +234,9 @@ class WekaCluster(object):
             for host in host_names:
                 fp.write(f"echo Stopping weka on {host}" + NL)
                 if self.config.target_hosts.candidates[host].is_reference:
-                    fp.write(PARA + f'cp ./resources_generator.py /tmp/' + NL)
-                    fp.write(PARA + f'sudo weka local stop; sudo weka local rm -f default' + NL)
+                    fp.write(PARA + 'cp ./resources_generator.py /tmp/' + NL)
+                    fp.write('sudo weka local stop' + NL)
+                    fp.write(PARA + 'sudo weka local rm -f default' + NL)
                 else:
                     fp.write(PARA + f'scp -p ./resources_generator.py {host}:/tmp/' + NL)
                     fp.write(PARA + f'ssh {host} "sudo weka local stop; sudo weka local rm -f default"' + NL)
@@ -239,7 +245,7 @@ class WekaCluster(object):
             for host in host_names:
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
                 if self.config.target_hosts.candidates[host].is_reference:
-                    fp.write(PARA + f'sudo /tmp/resources_generator.py -f --path /tmp --net')
+                    fp.write(PARA + 'sudo /tmp/resources_generator.py -f --path /tmp --net')
                 else:
                     fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
                 net_names = self._get_nics(host)
