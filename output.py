@@ -75,6 +75,7 @@ class WekaCluster(object):
                     if iface in all_pingable_ips:  # list of ips accessible
                         host.this_hosts_ifs.add(iface)
 
+
             temp = str()
             for nic in host.this_hosts_ifs:
                 if count > 0:
