@@ -131,6 +131,7 @@ class WekaCluster(object):
             for drivename, drive in sorted(host.drives.items()):
                 thishost += drive['devPath'] + ' '
             # thishost += '--force'  # don't force it - can overwrite boot drives!
+            thishost += f'    # {hostname}'
             result.append(thishost)
             # host_id += 1
         return result
