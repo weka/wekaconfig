@@ -203,6 +203,9 @@ class STEMHost(object):
             except NewConnectionError as exc:
                 #log.error(f"Unable to contact host {self.name}")
                 continue
+            except UnboundLocalError:
+                log.error(f"Unable to contact host {self.name}")
+                return None
             except Exception as exc:
                 log.error(f"Other exception on host {self.name}: {exc}")
                 continue
@@ -302,9 +305,12 @@ class WekaHostGroup():
         self.accessible_hosts = SortedDict()  # a dict of {ifname:(hostname)}  (set of hostnames on the nic)
         self.pingable_ips = SortedDict()
         self.networks = SortedDict()
-        self.reference_host = None
         self.candidates = SortedDict()
         self.rejected_hosts = SortedDict()
+        if len(beacons) == 0:
+            log.error("No beacons found?  Exiting")
+            sys.exit(1)
+        self.reference_host = beacons[0]
 
         default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
         self.beacons = beacons
@@ -794,7 +800,7 @@ def beacon_hosts():
     beacons = reference_host.host_api.weka_api_command("cluster_list_beacons", parms={})
 
     # make a dict of {hostname:[ipaddr]}
-    stem_beacons = SortedDict()
+    stem_beacons = dict()   # SortedDict()
     for ip, hostname in beacons.items():
         if hostname not in stem_beacons:
             stem_beacons[hostname] = [ip]
@@ -815,7 +821,10 @@ def scan_hosts(hostlist):
     :return: a dict containing the valid STEMHost objects
     """
     # make sure we can talk to the local weka container
-    this_host = STEMHost("localhost")
+    if len(hostlist) == 0:
+        this_host = STEMHost("localhost")
+    else:
+        this_host = STEMHost(hostlist[0])  # use the first host
     this_host.open_api([this_host.name])
     if this_host.host_api is None:
         log.info(f"ERROR: Unable to contact host '{this_host.name}' via API")
@@ -835,7 +844,7 @@ def scan_hosts(hostlist):
         stem_beacons = beacon_hosts()
     else:
         log.info("Using given hostnames/ips instead of beacons...")
-        stem_beacons = SortedDict()
+        stem_beacons = dict()   # SortedDict()
         for host in hostlist:
             try:
                 ip4 = ipaddress.ip_address(host)
