@@ -316,6 +316,7 @@ class WekaHostGroup():
         self.candidates = SortedDict()
         self.rejected_hosts = SortedDict()
         self.reference_host = reference_host
+        #self.clients = SortedDict()
 
         default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
         self.beacons = beacons
@@ -533,6 +534,7 @@ class WekaHostGroup():
         log.info("Exploring network... this may take a while")
 
         # set up for parallel execution ########################
+        # this uses the reference host to ping all the candidates on the dataplane networks
         log.debug(f"refhost.nics = {list(self.reference_host.nics.keys())}")
         for hostname, hostobj in self.candidates.items():
             log.info(f'Looking at host {hostname}...')
@@ -556,6 +558,15 @@ class WekaHostGroup():
     def analyze_networks(self):
         # note: self.accessible_hosts is a dict of {ifname:(hostname)}  (set of hostnames on the nic)
         # note that self.pingable_ips is a dict of {ifname:[ipaddr]}  (list of ip addrs pingable from this interface)
+
+
+        # open ssh to all the hosts - make sure we can get to them
+        #log.info(f"Opening ssh to hosts")
+        #self.open_ssh_toall()
+        #for host, host_obj in self.usable_hosts.values():
+        #    if host_obj.ssh_client is None:
+        #        # wait - this does candidates, not usable_hosts
+        #        self.reject_host(host_obj, "Unable to open ssh session")
 
         # merge the accessible_hosts sets - we need the superset for later
         usable_set = set()  # a set will always be unique... no duplicates
@@ -613,9 +624,6 @@ class WekaHostGroup():
             self.mixed_networking = True
 
         # go probe the hosts to see if they have a default route set, if so, we'll config weka to use it
-        log.info(f"Opening ssh to hosts")
-        self.open_ssh_toall()   # I think we did this already...
-
         log.info("Probing for gateways")
         for host, host_obj in self.usable_hosts.items():
             for nicname, nic_obj in host_obj.nics.items():
@@ -660,8 +668,13 @@ class WekaHostGroup():
         ssh_out = self.reference_host.run(f"ping -c1 -W1 -I {source_interface} {targetip.ip}") # , shell=True, capture_output=True, text=True)
         if ssh_out.status == 0:
             log.debug(f"Ping from {self.reference_host.name}/{source_interface} to target {hostname}/{targetip} successful - adding {hostname} to accessible_hosts")
-            # we were able to ping the host!  add it to the set of hosts we can access via this IF
+            # make sure we can ssh to the host
+            if hostobj.ssh_client is None:
+                hostobj.ssh_client = RemoteServer(hostname)
+                hostobj.ssh_client.connect()
+            #self.clients[hostname] = hostobj.ssh_client
 
+            # we were able to ping the host!  add it to the set of hosts we can access via this IF
             self.accessible_hosts[source_interface].add(hostname)
             self.pingable_ips[source_interface].append(targetip)
             if targetip.network not in self.networks[source_interface]:  # do this elsewhere?
