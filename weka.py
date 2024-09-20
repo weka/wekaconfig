@@ -547,11 +547,11 @@ class WekaHostGroup():
                     # source_interface is the interface on the reference host
                     # hostobj is the host we're pinging
                     # targetip is the ip on the host that we're pinging
-                    #threaded_method(self, WekaHostGroup.ping_clients, source_interface, hostobj, targetip)
-                    self.ping_clients(source_interface, hostobj, targetip)
+                    threaded_method(self, WekaHostGroup.ping_clients, source_interface, hostobj, targetip)
+                    #self.ping_clients(source_interface, hostobj, targetip)
 
         # execute the pings...  ###################
-        #default_threader.run()   # sets self.accessible_hosts and self.pingable_ips
+        default_threader.run()   # sets self.accessible_hosts and self.pingable_ips
 
     def analyze_networks(self):
         # note: self.accessible_hosts is a dict of {ifname:(hostname)}  (set of hostnames on the nic)
