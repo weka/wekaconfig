@@ -561,12 +561,8 @@ class WekaHostGroup():
 
 
         # open ssh to all the hosts - make sure we can get to them
-        #log.info(f"Opening ssh to hosts")
-        #self.open_ssh_toall()
-        #for host, host_obj in self.usable_hosts.values():
-        #    if host_obj.ssh_client is None:
-        #        # wait - this does candidates, not usable_hosts
-        #        self.reject_host(host_obj, "Unable to open ssh session")
+        log.info(f"Opening ssh to hosts")
+        self.open_ssh_toall()
 
         # merge the accessible_hosts sets - we need the superset for later
         log.info(f"starting network analysis")
@@ -670,9 +666,9 @@ class WekaHostGroup():
         if ssh_out.status == 0:
             log.debug(f"Ping from {self.reference_host.name}/{source_interface} to target {hostname}/{targetip} successful - adding {hostname} to accessible_hosts")
             # make sure we can ssh to the host
-            if hostobj.ssh_client is None:
-                hostobj.ssh_client = RemoteServer(hostname)
-                hostobj.ssh_client.connect()
+            #if hostobj.ssh_client is None:
+            #    hostobj.ssh_client = RemoteServer(hostname)
+            #    hostobj.ssh_client.connect()
             #self.clients[hostname] = hostobj.ssh_client
 
             # we were able to ping the host!  add it to the set of hosts we can access via this IF
@@ -715,16 +711,19 @@ class WekaHostGroup():
                       f" stderr={list(cmd_output.stderr)}")
         return False
 
+    def do_connect(self, ssh_session):
+        ssh_session.connect()
+
     def open_ssh_toall(self):
-        self.clients = SortedDict()
-        for host, host_obj in self.usable_hosts.items():
+        clients = dict()
+        for host, host_obj in self.candidates.items():
             # open sessions to all the hosts
             if host_obj.ssh_client is None:
-                self.clients[host] = RemoteServer(host)
-                host_obj.ssh_client = self.clients[host]
-            else:
-                self.clients[host] = host_obj.ssh_client
-        parallel(self.clients.values(), RemoteServer.connect)
+                host_obj.ssh_client = RemoteServer(host)
+            clients[host] = host_obj.ssh_client
+        parallel(clients.values(), RemoteServer.connect)
+        pass
+        #parallel(clients.values(), self.do_connect, self)
 
     def is_homogeneous(self):
         """
