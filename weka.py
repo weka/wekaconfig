@@ -569,6 +569,7 @@ class WekaHostGroup():
         #        self.reject_host(host_obj, "Unable to open ssh session")
 
         # merge the accessible_hosts sets - we need the superset for later
+        log.info(f"starting network analysis")
         usable_set = set()  # a set will always be unique... no duplicates
         something_wrong = False
         for host_set in self.accessible_hosts.values():
