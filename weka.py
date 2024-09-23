@@ -521,17 +521,14 @@ class WekaHostGroup():
             # see if this one has the same ips as the reference host
             reference_host_ips = [str(iface.ip) for iface in self.reference_host.nics.values()]
             host_ips = [str(iface.ip) for iface in host.nics.values()]
-            # if len(list(set(host_ips).intersection(reference_host_ips))) > 0:   # if any of the ips match
 
             if reference_host_ips == host_ips:
-                log.info(f"Found reference host {self.reference_host.name}")
-                self.candidates[self.reference_host.name] = self.reference_host
-                #host = self.reference_host
-                #host.is_local = self.reference_host.is_local
-                #host.is_reference = True
-                #host.ssh_client = self.reference_host.ssh_client
-                #self.reference_host = host
+                log.info(f"Found reference host {self.reference_host.name} in {host.name}")
+                if self.reference_host.name == "localhost":
+                    self.reference_host.name = host.name    # fix so it's not "localhost"
+                self.candidates[host.name] = self.reference_host
                 break
+                # what happens when we use localhost?  vince
 
         # make sure reference_hostname can talk to the others over the dataplane networks; narrow the list,
         # and collect details of what weka hosts we can see on each nic
