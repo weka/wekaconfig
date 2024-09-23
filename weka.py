@@ -40,6 +40,12 @@ def get_local_ips():
     import netifaces
     return [netifaces.ifaddresses(iface)[netifaces.AF_INET][0]['addr'] for iface in netifaces.interfaces() if netifaces.AF_INET in netifaces.ifaddresses(iface)]
 
+def connect(ssh_session):
+    try:
+        ssh_session.connect()
+    except:
+        log.error(f"Unable to connect to {ssh_session.hostname}")
+        return False
 
 class WekaInterface(ipaddress.IPv4Interface):
     def __init__(self, linklayer, name, address, speed):
@@ -580,7 +586,8 @@ class WekaHostGroup():
 
         # log.info(f"There are {len(usable_set)} ping-able hosts")
         for host in usable_set:
-            self.usable_hosts[host] = self.candidates[host]
+            if host in self.candidates:    # might not be if we can't ssh to it
+                self.usable_hosts[host] = self.candidates[host]
         # for some odd reason, the above ping doesn't work when loopback.  Go figure
         self.usable_hosts[self.reference_host.name] = self.reference_host  # he gets left out
 
@@ -711,9 +718,6 @@ class WekaHostGroup():
                       f" stderr={list(cmd_output.stderr)}")
         return False
 
-    def do_connect(self, ssh_session):
-        ssh_session.connect()
-
     def open_ssh_toall(self):
         clients = dict()
         for host, host_obj in self.candidates.items():
@@ -722,6 +726,11 @@ class WekaHostGroup():
                 host_obj.ssh_client = RemoteServer(host)
             clients[host] = host_obj.ssh_client
         parallel(clients.values(), RemoteServer.connect)
+        #parallel(clients.values(), connect)
+        for host, host_obj in self.candidates.copy().items():
+            if not host_obj.ssh_client.connected:
+                log.error(f"Unable to open ssh session to {host} - removing from list")
+                self.reject_host(host_obj, "Unable to open ssh session")
         pass
         #parallel(clients.values(), self.do_connect, self)
 
@@ -908,8 +917,8 @@ def scan_hosts(hostlist):
     reference_host.is_reference = True
 
     errors = False
-    # were we given a list of hosts to scan?
-    if len(hostlist) == 0:
+    # were we given a list of hosts to scan? (or a single host... then get beacons)
+    if len(hostlist) <= 1:
         log.info("looking for WEKA beacons on localhost")
         stem_beacons = beacon_hosts()
         # if we weren't given a list of hosts, we must be running on one of the nodes
