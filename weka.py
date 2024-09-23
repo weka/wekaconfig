@@ -6,6 +6,8 @@ import ipaddress
 import socket
 import sys
 from logging import getLogger
+
+import wekalib.exceptions
 from sortedcontainers import SortedDict
 
 from wekalib import signal_handling
@@ -91,6 +93,10 @@ class STEMHost(object):
         except CommunicationError:
             log.info(f"Error communicating with host {self.name} querying info")
             return
+        except wekalib.exceptions.STEMModeError:
+            log.info(f"host {self.name} is not in STEM mode")
+            return
+
 
         # take some of the info and put it in our object for easy reference
         self.num_cores = len(self.machine_info['cores'])
@@ -524,8 +530,8 @@ class WekaHostGroup():
 
             if reference_host_ips == host_ips:
                 log.info(f"Found reference host {self.reference_host.name} in {host.name}")
-                if self.reference_host.name == "localhost":
-                    self.reference_host.name = host.name    # fix so it's not "localhost"
+                #if self.reference_host.name == "localhost":
+                self.reference_host.name = host.name    # fix so it's not "localhost" or an ip addr
                 self.candidates[host.name] = self.reference_host
                 break
                 # what happens when we use localhost?  vince
