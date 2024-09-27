@@ -8,7 +8,7 @@ import sys
 from argparse import ArgumentParser, HelpFormatter
 from concurrent.futures import ThreadPoolExecutor
 from json import dumps
-from ipaddress import ip_address
+from ipaddress import ip_address, IPv4Address
 from math import ceil
 from urllib import request, error
 from socket import timeout
@@ -33,8 +33,8 @@ IS_SINGLE_CORE = int(os.popen("nproc").read().strip()) == 1  # TODO: validate co
 # Memory consts (from hugepages.d):
 WEKANODE_BUCKET_PROCESS_MEMORY = 3.9 * GiB
 WEKANODE_SSD_PROCESS_MEMORY = 2.2 * GiB
-WEKANODE_FRONTEND_PROCESS_MEMORY = 2.5 * GiB
-WEKANODE_MANAGER_PROCESS_MEMORY = 3.1 * GiB
+WEKANODE_FRONTEND_PROCESS_MEMORY = 2.3 * GiB
+WEKANODE_MANAGER_PROCESS_MEMORY = 2.1 * GiB
 
 OVERHEAD_PER_MBUF = 202 + 72 + 16 + 30  # GenericBaseBlock + QueuedBlock + Cache entries + unknown respectively
 MBUFS_IN_HUGEPAGE = 481  # max N such that `align4K(256*N) + 4096*N <= 2MB
@@ -74,6 +74,7 @@ CONST_RESOURCES = dict(
     memory=0,
     mode="BACKEND",
     net_devices=[],
+    ena_llq=True,
 )
 
 def is_cloud_env(check_aws=True, check_oci=True):
@@ -94,6 +95,8 @@ def is_cloud_env(check_aws=True, check_oci=True):
             except error.URLError:
                 pass
             except timeout:
+                pass
+            except ConnectionResetError:
                 pass
         return False
 
@@ -437,8 +440,6 @@ class ResourcesGenerator:
                                  "For allowing rotating disks - please add '--allow-rotational' as well")
         parser.add_argument("--allow-rotational", action='store_true',
                             help="Detect rotational disks")
-        parser.add_argument("--allocate-nics-exclusively", action='store_true',
-                            help="Set one unique net device per each io node, relevant when using virtual functions (VMware, KVM etc.)")
         parser.add_argument("--core-ids", default=[], nargs='+', type=int,
                             help="Specify manually which CPUs to allocate for weka nodes")
         parser.add_argument("--compute-core-ids", default=[], nargs='+', type=int,
@@ -464,8 +465,25 @@ class ResourcesGenerator:
         parser.add_argument("--use-only-nic-identifier", action='store_true', dest='use_only_nic_identifier',
                             help="use only the nic identifier when allocating the nics")
 
+        # Create a mutually exclusive group
+        group = parser.add_mutually_exclusive_group()
+
+        group.add_argument(
+            "--allocate-nics-exclusively", action='store_true',
+            help="Set one unique net device per each io node, relevant when using virtual functions (VMware, KVM etc.)")
+
+        group.add_argument(
+            "--dont-allocate-nics-exclusively", action='store_true',
+            help="Do not set one unique net device per each IO node"
+        )
+
         self.args = parser.parse_args()
-        self.exclusive_nics_policy = is_cloud_env() or self.args.allocate_nics_exclusively
+
+        if self.args.dont_allocate_nics_exclusively:
+            self.exclusive_nics_policy = False
+        else:
+            self.exclusive_nics_policy = is_cloud_env() or self.args.allocate_nics_exclusively
+
         _validate_net_dev()
         _verify_core_ids(self.args.drive_core_ids + self.args.compute_core_ids + self.args.frontend_core_ids)
         _verify_core_ids(self.args.core_ids)
@@ -575,6 +593,7 @@ class ResourcesGenerator:
         self._ensure_port_14000_is_used()
 
     def set_net_devices(self):
+        # format of this parameter is: iface_name/ip_addr+ipaddr/netmask_bits/gateway_ip/network_label
         def _validate_ips(ip):
             try:
                 ip_address(ip)
@@ -583,8 +602,18 @@ class ResourcesGenerator:
                 logger.error(err)
                 quit(1)
 
-        def _validate_netmask(netmask):
-            if not netmask.isdecimal() or int(netmask) not in range(0, 33):
+        def _is_ipv4(ip):
+            return type(ip_address(ip)) == IPv4Address
+
+        def _validate_netmask(ip, netmask):
+            if _is_ipv4(ip):
+                min_bits = 8
+                max_bits = 32
+            else:
+                min_bits = 8
+                max_bits = 128
+
+            if not netmask.isdecimal() or int(netmask) not in range(min_bits, max_bits+1):
                 logger.error("Invalid value for netmask: %s", netmask)
                 quit(1)
             return netmask
@@ -620,7 +649,7 @@ class ResourcesGenerator:
                 kwargs['ips'] = [ip.strip() for ip in ips]
             if arg_parts:
                 net_mask_arg = arg_parts.pop(0)
-                _validate_netmask(net_mask_arg)
+                _validate_netmask(ips[0], net_mask_arg)
                 kwargs['netmask'] = int(net_mask_arg)
             if arg_parts:
                 gateway = arg_parts.pop(0)
@@ -966,7 +995,6 @@ class ResourcesGenerator:
                     compute_nodes_count = len(list(filter(lambda n: n.is_compute(), container.nodes.values())))
                     memory = compute_node_hugepages_memory * compute_nodes_count
                     container.memory = memory
-                    container.dedicate_memory = False
                     logger.info("allocating %s GiB for %s container, (%s nodes)", memory / GiB, role, compute_nodes_count)
                 else:
                     container.memory = 0
@@ -1062,4 +1090,3 @@ class ResourcesGenerator:
 if __name__ == '__main__':
     rg = ResourcesGenerator()
     rg.generate()
-

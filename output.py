@@ -131,6 +131,7 @@ class WekaCluster(object):
             for drivename, drive in sorted(host.drives.items()):
                 thishost += drive['devPath'] + ' '
             # thishost += '--force'  # don't force it - can overwrite boot drives!
+            thishost += f'    # {hostname}'
             result.append(thishost)
             # host_id += 1
         return result
@@ -233,7 +234,7 @@ class WekaCluster(object):
 
             for host in host_names:
                 fp.write(f"echo Stopping weka on {host}" + NL)
-                if self.config.target_hosts.candidates[host].is_reference:
+                if self.config.target_hosts.candidates[host].is_local:
                     fp.write(PARA + 'cp ./resources_generator.py /tmp/' + NL)
                     fp.write('sudo weka local stop' + NL)
                     fp.write(PARA + 'sudo weka local rm -f default' + NL)
@@ -244,7 +245,7 @@ class WekaCluster(object):
             fp.write(NL + 'wait' + NL)
             for host in host_names:
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
-                if self.config.target_hosts.candidates[host].is_reference:
+                if self.config.target_hosts.candidates[host].is_local:
                     fp.write(PARA + 'sudo /tmp/resources_generator.py -f --path /tmp --net')
                 else:
                     fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
@@ -267,7 +268,7 @@ class WekaCluster(object):
             # start DRIVES container
             for host in host_names:
                 fp.write(f"echo Starting Drives container on server {host}" + NL)
-                if self.config.target_hosts.candidates[host].is_reference:
+                if self.config.target_hosts.candidates[host].is_local:
                     fp.write(PARA + f'sudo weka local setup {CONTAINER}' +
                              f' --name drives0 --resources-path /tmp/drives0.json' + NL)
                 else:
@@ -297,7 +298,7 @@ class WekaCluster(object):
                 hostid = 0
                 for host in host_names:  # not sure
                     fp.write(f"echo Starting drives container {container} on host {host}" + NL)
-                    if self.config.target_hosts.candidates[host].is_reference:
+                    if self.config.target_hosts.candidates[host].is_local:
                         fp.write(PARA + 'sudo ' + WLSC +
                                  f' --name drives{container}' +
                                  f' --resources-path /tmp/drives{container}.json' +
@@ -319,7 +320,7 @@ class WekaCluster(object):
                 hostid = 0
                 for host in host_names:  # not sure
                     fp.write(f"echo Starting Compute container {container} on host {host}" + NL)
-                    if self.config.target_hosts.candidates[host].is_reference:
+                    if self.config.target_hosts.candidates[host].is_local:
                         fp.write(PARA + 'sudo ' + WLSC +
                                  f' --name compute{container}' +
                                  f' --resources-path /tmp/compute{container}.json' +
@@ -359,7 +360,7 @@ class WekaCluster(object):
             hostid = 0
             for host in host_names:  # not sure
                 fp.write(f"echo Starting Front container on host {host}" + NL)
-                if self.config.target_hosts.candidates[host].is_reference:
+                if self.config.target_hosts.candidates[host].is_local:
                     fp.write(PARA + 'sudo ' + WLSC + ' --name frontend0 --resources-path /tmp/frontend0.json ' +
                              f'--join-ips={host_ips_string} --management-ips={host_ips[hostid].replace("+", ",")}' + NL)
                 else:
