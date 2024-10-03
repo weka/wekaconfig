@@ -56,14 +56,13 @@ if __name__ == '__main__':
     logging.getLogger("paramiko").setLevel(logging.ERROR)
     logging.getLogger("wekalib").setLevel(logging.ERROR)
     logging.getLogger("urllib3").setLevel(logging.ERROR)
-    logging.getLogger("wekapyutils.wekassh").setLevel(logging.ERROR)
     logging.getLogger("wekapyutils.sthreads").setLevel(logging.ERROR)
+    logging.getLogger("wekapyutils.wekassh").setLevel(logging.ERROR)
+    #logging.getLogger("wekassh").setLevel(logging.ERROR)
 
-    # local modules
-    #logging.getLogger("weka").setLevel(loglevel)
-    #logging.getLogger("logic").setLevel(DEFAULT)
-    #logging.getLogger("forms").setLevel(DEFAULT)
-    #logging.getLogger("widgets").setLevel(DEFAULT)
+    # quiet down fabric and invoke - they're really chatty
+    logging.getLogger("fabric").setLevel(logging.ERROR)
+    logging.getLogger("invoke").setLevel(logging.ERROR)
 
     # add a new logging handler so we can log summary messages to a file, but not to the console
     summary_log = logging.getLogger("summary")
