@@ -60,8 +60,9 @@ class WekaInterface(ipaddress.IPv4Interface):
 
 class STEMHost(object):
     # uses ONLY the API...
-    def __init__(self, name):
+    def __init__(self, name, port=14000):
         self.name = name
+        self.port = port
         self.host_api = None
         self.machine_info = None
         self.ssh_client = None
@@ -77,6 +78,7 @@ class STEMHost(object):
         self.version = None
         self.is_reference = False
         self.is_local = False
+        self.product_uuid = None
 
     def __str__(self):
         return self.name
@@ -103,6 +105,10 @@ class STEMHost(object):
         self.cpu_model = self.machine_info['cores'][0]['model']
         self.version = self.machine_info['version']
         self.total_ramGB = int(self.machine_info["memory"]["total"] / 1024 / 1024 / 1024)
+        try:
+            self.product_uuid = self.machine_info['osinfo']['sys_vendor_info']['product_uuid']
+        except:
+            self.product_uuid = ""
 
         for drive in self.machine_info['disks']:
             if drive['type'] == "DISK" and not drive['isRotational'] and not drive['isMounted'] and \
@@ -206,7 +212,7 @@ class STEMHost(object):
         for ip in ip_list:
             try:
                 log.debug(f"{self.name}: trying on {ip}")
-                self.host_api = WekaApi(ip, scheme="http", verify_cert=False, timeout=5)
+                self.host_api = WekaApi(ip, port=self.port, scheme="http", verify_cert=False, timeout=5)
                 break
             except LoginError:
                 log.debug(f"host {self.name} failed login on ip {ip}?")
@@ -305,7 +311,7 @@ class NamedDict(SortedDict):
 
 
 class WekaHostGroup():
-    def __init__(self, reference_host, beacons):
+    def __init__(self, reference_host, beacons, skip_gateway_check):
         """
         This routine is run before the TUI starts to scope out the cluster.
 
@@ -328,6 +334,7 @@ class WekaHostGroup():
         self.candidates = SortedDict()
         self.rejected_hosts = SortedDict()
         self.reference_host = reference_host
+        self.skip_gateway_check = skip_gateway_check
         #self.clients = SortedDict()
 
         default_threader.num_simultaneous = 5  # ssh has a default limit of 10 sessions at a time
@@ -344,6 +351,7 @@ class WekaHostGroup():
         log.debug(f"candidates = {list(self.candidates.keys())}")
 
         self.scan_machine_info()
+        self.check_uuids()
         log.debug(f"candidates = {list(self.candidates.keys())}")
         self.check_weka_release()
         log.debug(f"candidates = {list(self.candidates.keys())}")
@@ -380,7 +388,7 @@ class WekaHostGroup():
         for host, ip_list in self.beacons.items():
             # if we're going to do this, we have to create the STEMHost object first, not below
             log.debug(f"creating candidate for {host}")
-            candidate = STEMHost(host)
+            candidate = STEMHost(host, self.reference_host.port)
             # Open an API to each host, in parallel
             log.debug(f"opening api to {host}")
             threaded_method(candidate, STEMHost.open_api, ip_list)  # schedule to run (they're slow)
@@ -415,7 +423,29 @@ class WekaHostGroup():
                 log.error(f"Error communicating with {candidate.name} - removing from list")
                 self.reject_host(candidate, "Unable to fetch machine info")
                 continue
+            elif len(candidate.drives) == 0:
+                log.error(f"{candidate.name} has no usable drives?")
+                self.reject_host(candidate, "No valid data drives")
+                continue
         log.debug(f"Got machine info from {list(self.candidates.keys())}")
+
+    def check_uuids(self):
+        errors = False
+        by_uuid = dict()
+        for host in self.candidates.values():
+            if host.product_uuid not in by_uuid:
+                by_uuid[host.product_uuid] = list()
+            by_uuid[host.product_uuid].append(host.product_uuid)
+        if len(self.candidates) != len(by_uuid):
+            # check to make sure all uuids are unique
+            for host in self.candidates.values():
+                if len(by_uuid[host.product_uuid]) > 1:
+                    log.error(f"UUID {host.product_uuid} is duplicated on {by_uuid[host.name]}")
+                    errors = True
+        # Terminate hard
+        if errors:
+            log.critical(f"Duplicate/bad machine UUIDs detected.  Please contact WEKA Customer Success Team")
+            sys.exit(1)
 
     # WekaHostGroup.validate_nics
     def validate_nics(self):
@@ -478,6 +508,7 @@ class WekaHostGroup():
                 log.debug(f"    host {host} is running {self.weka_version}")
             #log.info(f"Host {host} added to list of possible cluster hosts")
 
+    """
     def check_weka_release_old(self):
         # find hosts that can cluster with reference_hostname - they pointed us at reference_hostname for a reason
         log.info(f"Reference Host {self.reference_host.name} is running WEKA release {self.reference_host.version}")
@@ -499,27 +530,10 @@ class WekaHostGroup():
                     self.reject_host(candidate, "No usable nics")
                     continue
             log.info(f"Host {host} added to list of possible cluster hosts")
+    """
 
     def explore_network(self):
         log.info("Preparing to explore network...")
-
-        # find the localhost (reference_host) in the candidates list (a STEMHost object)
-        #self.local_ips = get_local_ips()
-        #self.reference_host = None
-        """
-        for ip in self.local_ips:
-            for candidate in self.candidates.values():
-                candidate_ips = [str(iface.ip) for iface in candidate.nics.values()]
-                if ip in candidate_ips:
-                    self.reference_host = candidate
-                    candidate.is_reference = True
-                    break
-            if self.reference_host is not None:
-                break
-        if self.reference_host is None:
-            log.error(f"Unable to find local host in candidates list")
-            sys.exit(1)
-        """
 
         # There may be a reference_host of localhost, and another copy of it with a "real" hostname
         # so we need to make sure we only have one copy of the reference_host
@@ -649,12 +663,13 @@ class WekaHostGroup():
             self.mixed_networking = True
 
         # go probe the hosts to see if they have a default route set, if so, we'll config weka to use it
-        log.info("Probing for gateways")
-        for host, host_obj in self.usable_hosts.items():
-            for nicname, nic_obj in host_obj.nics.items():
-                if nic_obj.type != "IB":  # we don't support gateways on IB
-                    threaded_method(self, WekaHostGroup.get_gateways, host_obj, nic_obj)
-                    #self.get_gateways(host_obj, nic_obj)
+        if not self.skip_gateway_check:
+            log.info("Probing for gateways")
+            for host, host_obj in self.usable_hosts.items():
+                for nicname, nic_obj in host_obj.nics.items():
+                    if nic_obj.type != "IB":  # we don't support gateways on IB
+                        threaded_method(self, WekaHostGroup.get_gateways, host_obj, nic_obj)
+                        #self.get_gateways(host_obj, nic_obj)
 
         default_threader.run()   # update host object with gateway info
 
@@ -908,7 +923,7 @@ def beacon_hosts(reference_host):
     return stem_beacons
 
 
-def scan_hosts(hostlist):
+def scan_hosts(hostlist, port, skip_gateway_check):
     """
     scan for STEM-mode Weka hosts
     :param reference_hostname: str
@@ -916,10 +931,10 @@ def scan_hosts(hostlist):
     """
     # make sure we can talk to the local weka container/host
     if len(hostlist) == 0:
-        reference_host = STEMHost("localhost")
+        reference_host = STEMHost("localhost", port)
         reference_host.is_local = True
     else:
-        reference_host = STEMHost(hostlist[0])  # use the first host
+        reference_host = STEMHost(hostlist[0], port)  # use the first host
     reference_host.open_api([reference_host.name])
     if reference_host.host_api is None:
         log.info(f"ERROR: Unable to contact host '{reference_host.name}' via API")
@@ -974,7 +989,7 @@ def scan_hosts(hostlist):
             sys.exit(1)
 
     log.info(f"list of potential WEKA hosts: {list(stem_beacons.keys())}")
-    hostgroup = WekaHostGroup(reference_host, stem_beacons)
+    hostgroup = WekaHostGroup(reference_host, stem_beacons, skip_gateway_check)
     log.info("************************** Analysis **************************")
     if not hostgroup.is_homogeneous():
         log.info("Host group is not Homogeneous!  Please verify configuration(s)")
