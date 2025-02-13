@@ -91,6 +91,36 @@ class WekaCluster(object):
         return host_names, host_ips
 
 
+    def _join_ips(self):  # sets what the hostids will/should be
+        # make a dict of hostname:[ips]
+        host_ips_dict = dict()
+        host_names = list()
+        host_ips = str()
+        hostid = 0
+        for hostname, host in sorted(self.config.selected_hosts.items()):
+            host_ips_dict[hostname] = list()
+
+            for nic in host.this_hosts_ifs:
+                host_ips_dict[hostname].append(nic.ip.exploded)
+
+        # make a string
+        num_hosts = len(self.config.selected_hosts.keys())
+        if num_hosts > 7:
+            num_hosts = 7
+        elif num_hosts % 2 != 1: # if even number...
+            num_hosts -= 1   # make it an odd number
+
+        if num_hosts <= 3:
+            log.error(f"Too few hosts?  num_hosts = {num_hosts}")
+
+        # pick out the first "num_hosts" ip addresses (ips could be 2-4x the number of hosts)
+        full_list = list(sorted(host_ips_dict.keys()))
+        join_ip_list = list()
+        for host in full_list[:num_hosts]:
+            join_ip_list += host_ips_dict[host]
+        return ','.join(join_ip_list)
+
+
     # returns a list of strings
     def _get_nics(self, hostname):  # for MCB... need a list of nics for a host
         # base = 'host net add '
@@ -246,9 +276,9 @@ class WekaCluster(object):
             for host in host_names:
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
                 if self.config.target_hosts.candidates[host].is_local:
-                    fp.write(PARA + 'sudo /tmp/resources_generator.py -f --path /tmp --net')
+                    fp.write(PARA + 'sudo /tmp/resources_generator.py -f --path /tmp --use_only_nic_identifier --net')
                 else:
-                    fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --net')
+                    fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --use_only_nic_identifier --net')
                 net_names = self._get_nics(host)
                 for name in net_names:
                     fp.write(f" {name}")
@@ -281,10 +311,9 @@ class WekaCluster(object):
             # create cluster
             fp.write(NL)
             fp.write(create_command)
-            #fp.write(NL)
 
-            # for the remaining 'local setup container' commands, we want a comma-separated list of all host_ips
-            host_ips_string = ','.join(host_ips).replace('+', ',')
+            # format the --join-ips list of ip addrs
+            host_ips_string = self._join_ips()
 
             # changing versions
             WLS = 'weka local setup '
