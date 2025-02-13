@@ -20,7 +20,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Weka Cluster Configurator")
     parser.add_argument("hosts", type=str, nargs="*",
                         help="a list of hosts to configure, or none to use cluster beacons", default=None)
+    parser.add_argument("-p", "--port", type=int, default=14000, nargs="?",help="base TCP port to connect to")
     parser.add_argument("-v", "--verbosity", action="count", default=0, help="increase output verbosity")
+    parser.add_argument("--skip-gateway-check", dest="gateway_check", default=False, action="store_true",
+                        help="skip checking for gateways")
     parser.add_argument("--version", dest="version", default=False, action="store_true",
                         help="Display version number")
     args = parser.parse_args()
@@ -81,7 +84,7 @@ if __name__ == '__main__':
 
     print(f"collecting host data... please wait...")
     log.info("*******************  Starting Weka Configurator  *******************")
-    host_list = scan_hosts(args.hosts)
+    host_list = scan_hosts(args.hosts, args.port, args.gateway_check)
 
     # pause here so the user can review what's happened before we go to full-screen mode
     if len(host_list.reference_host.nics) < 1:
