@@ -276,9 +276,9 @@ class WekaCluster(object):
             for host in host_names:
                 fp.write(f"echo Running Resources generator on host {host}" + NL)
                 if self.config.target_hosts.candidates[host].is_local:
-                    fp.write(PARA + 'sudo /tmp/resources_generator.py -f --path /tmp --use_only_nic_identifier --net')
+                    fp.write(PARA + 'sudo /tmp/resources_generator.py -f --path /tmp --use-only-nic-identifier --net')
                 else:
-                    fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --use_only_nic_identifier --net')
+                    fp.write(PARA + f'ssh {host} sudo /tmp/resources_generator.py -f --path /tmp --use-only-nic-identifier --net')
                 net_names = self._get_nics(host)
                 for name in net_names:
                     fp.write(f" {name}")
