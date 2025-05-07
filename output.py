@@ -152,6 +152,7 @@ class WekaCluster(object):
 
         return result
 
+    """
     def _drive_add(self):
         base = 'drive add '
         # host_id = 0
@@ -165,6 +166,7 @@ class WekaCluster(object):
             result.append(thishost)
             # host_id += 1
         return result
+    """
 
     def _host_cores(self):
         base = 'host cores '
@@ -239,7 +241,7 @@ class WekaCluster(object):
 
     def _start_io(self):
         return "start-io"
-        pass
+
 
     def cluster_config(self, file):
         if self.config.Multicontainer:
@@ -295,7 +297,7 @@ class WekaCluster(object):
 
             fp.write('wait' + NL)
 
-            # start DRIVES container
+            # start DRIVES0 container so we can form a cluster
             for host in host_names:
                 fp.write(f"echo Starting Drives container on server {host}" + NL)
                 if self.config.target_hosts.candidates[host].is_local:
@@ -344,7 +346,7 @@ class WekaCluster(object):
                 # wait for parallel commands to finish
                 fp.write('wait' + NL)
 
-            # create compute container
+            # create compute containers
             for container in range(0, math.ceil(self.config.selected_cores.compute / 19)):
                 hostid = 0
                 for host in host_names:  # not sure
@@ -367,10 +369,24 @@ class WekaCluster(object):
             fp.write('wait' + NL)
 
             # add drives
+            #fp.write(NL)
+            #for item in self._drive_add():
+            #    fp.write(PARA + WEKA_CLUSTER + item + NL)
             fp.write(NL)
-            for item in self._drive_add():
-                fp.write(PARA + WEKA_CLUSTER + item + NL)
-            fp.write(NL)
+            fp.write("for HOSTNAME in ")
+            #hosts=sorted(self.config.selected_hosts.keys())
+            #hosts2=' '.join(hosts)
+            fp.write(f'{" ".join(sorted(self.config.selected_hosts.keys()))}; do' + NL)
+            fp.write("  for CONTAINER in drives{0..")
+            fp.write(f"{math.ceil(self.config.selected_cores.drives / 19)-1}")
+            fp.write("}; do" + NL)
+            fp.write("    CONTAINER_ID=$(weka cluster container -F container=$CONTAINER,hostname=$HOSTNAME -o id --no-header)" + NL)
+            fp.write('    if [ "$CONTAINER_ID" != "" ]; then' + NL)
+            fp.write("      DRIVES=$(ssh $HOSTNAME jq '.drives[].path' /tmp/$CONTAINER.json | tr -d '\"')" + NL)
+            fp.write("      para ${PARA} sudo weka cluster drive add $CONTAINER_ID $DRIVES" + NL)
+            fp.write("    fi" + NL)
+            fp.write("  done" + NL)
+            fp.write("done" + NL)
 
             # wait for parallel commands to finish
             fp.write(NL + 'wait' + NL)

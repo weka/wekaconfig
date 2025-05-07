@@ -29,7 +29,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     if args.version:
-        print(f"{progname} version 2025.02.25")
+        print(f"{progname} version 2025.05.07")
         sys.exit(0)
 
     if args.verbosity == 0:
