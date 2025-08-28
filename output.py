@@ -37,6 +37,9 @@ fi
 
 echo starting - PARA is $PARA
 
+weka status 2>&1 > /dev/null
+if [ $? != 100 ]; then echo "Not in STEM mode"; exit; fi
+
 # ------------------ custom script below --------------
 """
 PARA = 'para ${PARA} '
