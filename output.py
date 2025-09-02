@@ -37,8 +37,7 @@ fi
 
 echo starting - PARA is $PARA
 
-weka status 2>&1 > /dev/null
-if [ $? != 100 ]; then echo "Not in STEM mode"; exit; fi
+
 
 # ------------------ custom script below --------------
 """
@@ -264,6 +263,21 @@ class WekaCluster(object):
 
         with file as fp:
             fp.write(SCRIPT_PREAMBLE + NL)
+            if self.config.target_hosts.candidates[host_names[0]].is_local:
+                fp.write(" weka status > /dev/null 2>&1; STATUS=$?; "
+                         "if [ $STATUS == 127 ]; "
+                         "then echo \"Weka is not installed on $HOSTNAME?\"; "
+                         "exit 1; fi; if [ $STATUS != 100 ]; then echo \"Weka is not in STEM Mode on $HOSTNAME?\";"
+                         " exit 1; fi" + NL)
+            else:
+                fp.write(f"ssh {host_names[0]} 'weka status > /dev/null 2>&1; STATUS=$?; "
+                         "if [ $STATUS == 127 ]; "
+                         "then echo \"Weka is not installed on $HOSTNAME?\"; "
+                         "exit 1; fi; if [ $STATUS != 100 ]; then echo \"Weka is not in STEM Mode on $HOSTNAME?\";"
+                         " exit 1; fi'" + NL)
+                fp.write(f"if [ $? == 1 ]; then exit 1; fi" + NL)
+                create_command = f"ssh {host_names[0]} '{create_command}'"
+
 
             for host in host_names:
                 fp.write(f"echo Stopping weka on {host}" + NL)
@@ -313,6 +327,7 @@ class WekaCluster(object):
 
             # create cluster
             fp.write(NL)
+
             fp.write(create_command)
 
             # format the --join-ips list of ip addrs
@@ -371,15 +386,25 @@ class WekaCluster(object):
 
             # add drives
             fp.write(NL)
-            for item in self._drive_add():
-                fp.write(PARA + WEKA_CLUSTER + item + NL)
-            fp.write(NL)
+            if self.config.target_hosts.candidates[host_names[0]].is_local:
+                for item in self._drive_add():
+                    fp.write(PARA + WEKA_CLUSTER + item + NL)
+                fp.write(NL)
+            else:
+                for item in self._drive_add():
+                    fp.write(f"{PARA} ssh {host_names[0]} " + WEKA_CLUSTER + item + NL)
+                fp.write(NL)
 
             # wait for parallel commands to finish
             fp.write(NL + 'wait' + NL)
 
-            fp.write(WEKA_CLUSTER + self._parity() + NL)
-            fp.write(WEKA_CLUSTER + self._hot_spare() + NL)
+            if self.config.target_hosts.candidates[host_names[0]].is_local:
+                fp.write(WEKA_CLUSTER + self._parity() + NL)
+                fp.write(WEKA_CLUSTER + self._hot_spare() + NL)
+            else:
+                fp.write(f"ssh {host_names[0]} '"+WEKA_CLUSTER + self._parity()+"'" + NL)
+                fp.write(f"ssh {host_names[0]} '"+WEKA_CLUSTER + self._hot_spare()+"'" + NL)
+
             cloud = self._cloud()
             if cloud is not None:
                 fp.write(WEKA + cloud + NL)
